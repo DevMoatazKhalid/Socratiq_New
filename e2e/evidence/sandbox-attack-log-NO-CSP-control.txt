@@ -1,0 +1,14 @@
+parentDoc=blocked:SecurityError
+topDoc=blocked:SecurityError
+localStorage=blocked:SecurityError
+cookie=blocked:SecurityError
+indexedDB=blocked:SecurityError
+topNavigate=blocked:SecurityError
+popup=blocked
+form=submitted?
+ws=blocked
+fetch=ALLOWED
+script=ALLOWED
+img=blocked
+
+requests that reached the local listener: ["GET /ws","GET /fetch","GET /x.js","GET /img.png"]

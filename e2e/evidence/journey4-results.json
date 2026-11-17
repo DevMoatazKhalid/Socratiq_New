@@ -1,0 +1,52 @@
+[
+  {
+    "name": "setup: the student saved a board (student rectangle + AI ellipse)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "the teacher opens the student's submission page and the board renders",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "the board shows the student's dark strokes AND the AI's teal-edged ellipse (authorship is visible)",
+    "ok": true,
+    "detail": "{\"teal\":241,\"dark\":145}"
+  },
+  {
+    "name": "the teacher's attempts to draw or delete change nothing in the database",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "and the teacher page sent no write requests at all",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "API: the teacher cannot PUT to the student board endpoint",
+    "ok": true,
+    "detail": "status 403"
+  },
+  {
+    "name": "API: the board is unchanged after that attempt",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "API: the teacher cannot read a student's board in a course they don't teach",
+    "ok": true,
+    "detail": "status 404"
+  },
+  {
+    "name": "API: the teacher's view of their own student includes the scene and the AI authorship metadata",
+    "ok": true,
+    "detail": "status 200, elements=2"
+  },
+  {
+    "name": "after the student's later save, the teacher's reload shows the new content",
+    "ok": true,
+    "detail": "elements=3"
+  }
+]

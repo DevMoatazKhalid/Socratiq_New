@@ -1,0 +1,62 @@
+[
+  {
+    "name": "server accepts a large board (1,800 elements)",
+    "ok": true,
+    "detail": "HTTP 200, request 767 KB, 144 ms"
+  },
+  {
+    "name": "server returns it quickly",
+    "ok": true,
+    "detail": "108 ms, 1800 elements"
+  },
+  {
+    "name": "drawing on a 1,800-element board is not disproportionately slower than on an empty board (same 30-move stroke)",
+    "ok": true,
+    "detail": "large 4879 ms vs empty 4601 ms (+6%); absolute numbers are inflated by software-rendered headless Chromium"
+  },
+  {
+    "name": "autosave of the large board completes and is confirmed",
+    "ok": true,
+    "detail": "~1940 ms after the stroke"
+  },
+  {
+    "name": "the new stroke is in the database next to the 1,800 existing elements",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "only a bounded number of saves were sent for one stroke (no save storm)",
+    "ok": true,
+    "detail": "scene_rev=2"
+  },
+  {
+    "name": "reload cycle 1: the large board renders",
+    "ok": true,
+    "detail": "4160 ms"
+  },
+  {
+    "name": "reload cycle 2: the large board renders",
+    "ok": true,
+    "detail": "3174 ms"
+  },
+  {
+    "name": "reload cycle 3: the large board renders",
+    "ok": true,
+    "detail": "3489 ms"
+  },
+  {
+    "name": "reload cycle 4: the large board renders",
+    "ok": true,
+    "detail": "3123 ms"
+  },
+  {
+    "name": "JS heap does not grow without bound across 4 reload cycles",
+    "ok": true,
+    "detail": "heap MB per cycle: 87 -> 87 -> 87 -> 87"
+  },
+  {
+    "name": "no uncaught page errors on the large board",
+    "ok": true,
+    "detail": ""
+  }
+]

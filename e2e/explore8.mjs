@@ -1,0 +1,12 @@
+import { launch, signedInContext, WEB, sleep } from './lib.mjs'
+const b = await launch(); const ctx = await signedInContext(b, 'S1'); const page = await ctx.newPage()
+await page.goto(WEB + '/student/courses/C1/assignments/A1/coach', { waitUntil: 'domcontentloaded' }); await sleep(3500)
+await page.locator('button:has-text("Whiteboard")').first().click(); await sleep(6500)
+await page.locator('button:has-text("Fit to")').first().click(); await sleep(800)
+await page.mouse.click(1050, 460); await sleep(1200)
+console.log('iframes after single click', (await page.$$('iframe')).length)
+console.log('BUTTONS', JSON.stringify(await page.$$eval('button', bs => bs.map(x => (x.getAttribute('aria-label')||x.title||x.textContent||'').trim().slice(0,36)).filter(Boolean).filter(t=>/open|sim|edit|dup|delete|pin|run|play/i.test(t)))))
+await page.screenshot({ path: 'evidence/explore-card-clicked.png' })
+await page.mouse.dblclick(1050, 460); await sleep(1500)
+console.log('iframes after dblclick', (await page.$$('iframe')).length)
+await b.close()

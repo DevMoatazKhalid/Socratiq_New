@@ -1,0 +1,11 @@
+import { launch, signedInContext, WEB, sleep } from './lib.mjs'
+const b = await launch(); const ctx = await signedInContext(b, 'S1'); const page = await ctx.newPage()
+const logs = []; page.on('console', m => { if (['error','warning'].includes(m.type())) logs.push(m.type()+': '+m.text().slice(0,160)) }); page.on('pageerror', e => logs.push('PAGEERROR '+e.message.slice(0,200)))
+const reqs = []; page.on('response', r => { if (r.url().includes('/api/v1')) reqs.push(r.status()+' '+r.request().method()+' '+r.url().replace('http://localhost:8000','')) })
+await page.goto(WEB + '/student/courses/C1/assignments/A1/coach', { waitUntil: 'domcontentloaded' })
+await sleep(9000)
+await page.screenshot({ path: 'evidence/explore-coach.png' })
+console.log('URL', page.url()); console.log(reqs.slice(0,14).join('\n')); console.log(logs.slice(0,8).join('\n'))
+console.log('BUTTONS', JSON.stringify(await page.$$eval('button', bs => bs.map(x => (x.getAttribute('aria-label')||x.title||x.textContent||'').trim().slice(0,30)).filter(Boolean).slice(0,60))))
+console.log('excalidraw?', await page.$('.excalidraw') !== null)
+await b.close()

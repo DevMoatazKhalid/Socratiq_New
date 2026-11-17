@@ -1,0 +1,195 @@
+{
+  "timestamp": "2026-11-17T22:35:01.410Z",
+  "browser": "Chromium Headless",
+  "total": 31,
+  "passed": 31,
+  "failed": 0,
+  "results": [
+    {
+      "suite": "Suite 1",
+      "testName": "Workspace split container rendered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 1",
+      "testName": "Left panel (Conversation) rendered with proper ARIA",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 1",
+      "testName": "Right panel (Board) rendered with proper ARIA",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 1",
+      "testName": "Splitter separator rendered with role=separator",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 1",
+      "testName": "Splitter aria-valuenow is numeric percentage",
+      "ok": true,
+      "detail": "Initial: 40%"
+    },
+    {
+      "suite": "Suite 1",
+      "testName": "PersonaSelector button present in header",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 2",
+      "testName": "Splitter dragged right increases width percentage",
+      "ok": true,
+      "detail": "From 40% to 51.5%"
+    },
+    {
+      "suite": "Suite 2",
+      "testName": "Splitter double-click resets to default 40%",
+      "ok": true,
+      "detail": "Reset value: 40%"
+    },
+    {
+      "suite": "Suite 3",
+      "testName": "ArrowRight increases percentage by 2%",
+      "ok": true,
+      "detail": "Now 42%"
+    },
+    {
+      "suite": "Suite 3",
+      "testName": "Shift+ArrowRight increases percentage by 10%",
+      "ok": true,
+      "detail": "Now 52%"
+    },
+    {
+      "suite": "Suite 3",
+      "testName": "Home key jumps to MIN_PCT (25%)",
+      "ok": true,
+      "detail": "Value: 25%"
+    },
+    {
+      "suite": "Suite 3",
+      "testName": "End key jumps to MAX_PCT (75%)",
+      "ok": true,
+      "detail": "Value: 75%"
+    },
+    {
+      "suite": "Suite 3",
+      "testName": "Enter key resets to default (40%)",
+      "ok": true,
+      "detail": "Value: 40%"
+    },
+    {
+      "suite": "Suite 4",
+      "testName": "Panel toggle buttons (Conversation, Board) rendered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 4",
+      "testName": "Expanding Conversation hides Board pane via CSS class",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 4",
+      "testName": "Restoring panels shows both without remounting",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 4",
+      "testName": "Expanding Board hides Conversation pane via CSS class",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 5",
+      "testName": "Persona button displays teaching style label",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 5",
+      "testName": "Persona selection dialog opened with role=dialog",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 5",
+      "testName": "Dialog renders 5 teaching personas as radio options",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 5",
+      "testName": "Persona dialog renders Arabic strings with dir=rtl and lang=ar",
+      "ok": true,
+      "detail": "Found 10 Arabic elements"
+    },
+    {
+      "suite": "Suite 5",
+      "testName": "All 5 authentic Arabic persona names present",
+      "ok": true,
+      "detail": "Verified: المرشد السقراطي, المهندس العملي, المفكّر الناقد, المعلّم الصبور, المستكشف البصري"
+    },
+    {
+      "suite": "Suite 5",
+      "testName": "Selecting persona closes the dialog",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 5",
+      "testName": "ARIA live region announces persona change politely",
+      "ok": true,
+      "detail": "Notice: \"Teaching style changed to The Socratic Guide. Your conversation continues from here.\""
+    },
+    {
+      "suite": "Suite 5",
+      "testName": "Persona button label updated to newly selected persona",
+      "ok": true,
+      "detail": "Label: Teaching style: The Socratic Guide"
+    },
+    {
+      "suite": "Suite 6",
+      "testName": "Width < 1024px replaces split with role=tablist",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 6",
+      "testName": "Tablist renders Chat and Whiteboard tabs",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 6",
+      "testName": "Clicking Whiteboard tab activates whiteboard panel",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 6",
+      "testName": "Mobile layout renders responsive composer input",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "suite": "Suite 7",
+      "testName": "Splitter responds correctly to keyboard under dir=rtl",
+      "ok": true,
+      "detail": "From 40% to 38%"
+    },
+    {
+      "suite": "Suite 8",
+      "testName": "Native canvas element rendered on SmartBoard surface",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

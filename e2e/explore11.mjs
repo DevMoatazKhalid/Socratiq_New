@@ -1,0 +1,11 @@
+import { launch, signedInContext, WEB, sleep } from './lib.mjs'
+const b = await launch(); const ctx = await signedInContext(b, 'S1'); const page = await ctx.newPage()
+await page.goto(WEB + '/student/courses/C1/assignments/A1/coach', { waitUntil: 'domcontentloaded' }); await sleep(3500)
+await page.locator('button:has-text("Whiteboard")').first().click(); await sleep(6000)
+console.log('TOOLBAR', JSON.stringify(await page.$$eval('[data-testid^="toolbar-"]', xs => xs.map(x => x.getAttribute('data-testid')))))
+await page.locator('.main-menu-trigger, [data-testid="main-menu-trigger"]').first().click().catch(() => {}); await sleep(600)
+console.log('MENU', JSON.stringify(await page.$$eval('[data-testid], .dropdown-menu-item', xs => xs.map(x => (x.getAttribute('data-testid') || '') + '|' + (x.textContent || '').trim().slice(0, 28)).filter(t => t.length > 3).slice(0, 40))))
+await page.screenshot({ path: 'evidence/explore-menu.png' })
+await page.keyboard.press('Escape')
+console.log('ZOOM', JSON.stringify(await page.$$eval('button', bs => bs.map(x => (x.getAttribute('aria-label') || x.title || '').trim()).filter(t => /zoom|undo|redo|fit|reset|library|help/i.test(t)))))
+await b.close()

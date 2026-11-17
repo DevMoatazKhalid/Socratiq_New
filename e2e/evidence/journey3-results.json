@@ -1,0 +1,127 @@
+[
+  {
+    "name": "image provider failure: the user sees an error (not a success)",
+    "ok": true,
+    "detail": "Something went wrong on our side. Please try again."
+  },
+  {
+    "name": "image provider failure: the server answered with an error status, not 200",
+    "ok": true,
+    "detail": "[502]"
+  },
+  {
+    "name": "image provider failure: nothing was inserted or saved",
+    "ok": true,
+    "detail": "elements=0"
+  },
+  {
+    "name": "malicious (SVG with script) provider payload is rejected",
+    "ok": true,
+    "detail": "[502]"
+  },
+  {
+    "name": "malicious payload: nothing inserted or saved",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "empty/whitespace prompt makes no request",
+    "ok": true,
+    "detail": "disabled=true requests=0"
+  },
+  {
+    "name": "rapid repeated clicks cause exactly one generation request",
+    "ok": true,
+    "detail": "requests=1"
+  },
+  {
+    "name": "and exactly one diagram on the board (no duplicates)",
+    "ok": true,
+    "detail": "arrows=3"
+  },
+  {
+    "name": "backend unreachable: the UI says the work is NOT saved (never \"Saved\")",
+    "ok": true,
+    "detail": "Save failed: retrying"
+  },
+  {
+    "name": "and the database really has nothing yet",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "after the backend returns, the pending work is saved automatically/with Retry",
+    "ok": true,
+    "detail": "elements=1"
+  },
+  {
+    "name": "and the UI now says Saved",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "tab B (stale) is told, in visible text, that the board changed elsewhere, offered Reload, and is NOT shown as saved",
+    "ok": true,
+    "detail": "This board was changed in another window or tab. Reload the page to see the latest version; saving from here w"
+  },
+  {
+    "name": "tab A's work survived: tab B did not overwrite it",
+    "ok": true,
+    "detail": "A saved 1, now 1"
+  },
+  {
+    "name": "no token: board read is 401",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "malformed/forged token: board read is 401",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "a student of ANOTHER course cannot read this board",
+    "ok": true,
+    "detail": "status 404"
+  },
+  {
+    "name": "a student of ANOTHER course cannot write this board",
+    "ok": true,
+    "detail": "status 404"
+  },
+  {
+    "name": "a teacher cannot write through the student endpoint",
+    "ok": true,
+    "detail": "status 403"
+  },
+  {
+    "name": "unauthenticated generate-image is 401 (no open proxy to the provider key)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "unauthenticated generate-simulation is 401 (no open proxy to the provider key)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "unauthenticated generate-vector is 401 (no open proxy to the provider key)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "unauthenticated chat is 401 (no open proxy to the provider key)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "no session in the browser: the board is not shown, the user is sent to sign in",
+    "ok": true,
+    "detail": "http://localhost:5173/login"
+  },
+  {
+    "name": "an expired/revoked token never exposes the board (API 401 -> sign-in or error, no editable board)",
+    "ok": true,
+    "detail": "http://localhost:5173/student/courses/C1/assignments/A1/coach"
+  }
+]

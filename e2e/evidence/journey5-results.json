@@ -1,0 +1,67 @@
+[
+  {
+    "name": "the UI shows a connecting state first, then Listening only after the provider connection exists",
+    "ok": true,
+    "detail": "(no connecting text seen)"
+  },
+  {
+    "name": "the browser opened the relay WebSocket on the app origin (not directly to the provider)",
+    "ok": true,
+    "detail": "[\"ws://localhost:8000/api/v1/smartboard/live\",\"ws://localhost:8000/api/v1/smartboard/live\"]"
+  },
+  {
+    "name": "the relay connected to the (fake) provider exactly once, with the key in its handshake",
+    "ok": true,
+    "detail": "{\"connected\":1}"
+  },
+  {
+    "name": "the provider received the SERVER's setup (pedagogical rules present, client-supplied text absent)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "microphone audio chunks really flowed browser -> relay -> provider",
+    "ok": true,
+    "detail": "chunks=20"
+  },
+  {
+    "name": "provider audio came back and the UI reflects a live conversation (no error state)",
+    "ok": true,
+    "detail": "Listening to you…"
+  },
+  {
+    "name": "ending the call closes the provider connection",
+    "ok": true,
+    "detail": "{\"connected\":1,\"closed\":1}"
+  },
+  {
+    "name": "and microphone audio stops flowing (the capture is really released)",
+    "ok": true,
+    "detail": "chunks 25 -> 25 -> 25"
+  },
+  {
+    "name": "the provider dropping mid-session is reported to the user (not left looking connected)",
+    "ok": true,
+    "detail": "Session ended"
+  },
+  {
+    "name": "after the drop the browser has stopped capturing/sending audio",
+    "ok": true,
+    "detail": "chunks 3"
+  },
+  {
+    "name": "a forged token never reaches the provider (relay or API refuses first)",
+    "ok": true,
+    "detail": "{\"mode\":\"ok\",\"connected\":0,\"closed\":0,\"audio_chunks\":0,\"paths\":[],\"setup_has_server_rules\":false,\"setup_has_client_evil\":false}"
+  },
+  {
+    "name": "microphone denied: the user is told so",
+    "ok": true,
+    "detail": "No microphone was found."
+  },
+  {
+    "name": "microphone denied: the provider session is closed, not left running",
+    "ok": true,
+    "detail": "{\"connected\":1,\"closed\":1}"
+  }
+]

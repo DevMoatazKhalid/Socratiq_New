@@ -1,0 +1,122 @@
+[
+  {
+    "name": "image generation hit the real route and succeeded",
+    "ok": true,
+    "detail": "[\"200 GET whiteboard\",\"200 POST generate-image\",\"200 PUT whiteboard\"]"
+  },
+  {
+    "name": "the image element is persisted with its binary data in the database",
+    "ok": true,
+    "detail": "image/png 2KB"
+  },
+  {
+    "name": "the image is a real decodable PNG (magic bytes) not a placeholder",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "image has sane size on the board",
+    "ok": true,
+    "detail": "380x380"
+  },
+  {
+    "name": "image is marked as AI-generated",
+    "ok": true,
+    "detail": "\"ai\""
+  },
+  {
+    "name": "simulation runs in the sandboxed frame and its clock advances",
+    "ok": true,
+    "detail": "t 1.38 -> 2.31"
+  },
+  {
+    "name": "iframe sandbox is exactly allow-scripts",
+    "ok": true,
+    "detail": "allow-scripts"
+  },
+  {
+    "name": "the moving object really moves (position changes)",
+    "ok": true,
+    "detail": "x 23.7 -> -41"
+  },
+  {
+    "name": "Pause stops the simulation",
+    "ok": true,
+    "detail": "t 2.81 -> 2.81"
+  },
+  {
+    "name": "Play resumes it",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "Reset restarts it",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "the slider changes the dynamics (stiffer spring oscillates faster)",
+    "ok": true,
+    "detail": "49,57,55,46,30,6,-15,-38,-53,-57,-50,-36"
+  },
+  {
+    "name": "pinning creates a persistent simulation card in the database",
+    "ok": true,
+    "detail": "rectangle 320x180"
+  },
+  {
+    "name": "the card stores the runnable source code",
+    "ok": true,
+    "detail": "908 chars"
+  },
+  {
+    "name": "the card has a title and a persistent identifier",
+    "ok": true,
+    "detail": "{\"title\":\"spring mass oscillator\",\"id\":\"600c21f1-0457-4ee0-8493-d548a2f37ae9\"}"
+  },
+  {
+    "name": "the card is not an empty rectangle (it carries a visible label/preview)",
+    "ok": true,
+    "detail": "[\"image\",\"rectangle\",\"text\"]"
+  },
+  {
+    "name": "the card is associated with the AI author (not student)",
+    "ok": true,
+    "detail": "{\"v\":1,\"opId\":\"e3d14e50-4e2c-4e59-8abb-eb6a21257186\",\"role\":\"simulation\",\"author\":\"ai\",\"legacyId\":\"sim-600c21f1-0457-4ee0-8493-d548a2f37ae9\"}"
+  },
+  {
+    "name": "after reload the server returns every element (image + simulation card + labels)",
+    "ok": true,
+    "detail": "3 vs 3"
+  },
+  {
+    "name": "selecting the persisted card and choosing \"Open and run\" reopens the simulation",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "the reopened simulation animates again",
+    "ok": true,
+    "detail": "t 2.24 -> 3.08"
+  },
+  {
+    "name": "and responds to controls after reload (Pause)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "a second authorized session opens the same persisted simulation",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "and it animates in that session too",
+    "ok": true,
+    "detail": "t 1.84 -> 2.68"
+  },
+  {
+    "name": "no uncaught page errors",
+    "ok": true,
+    "detail": ""
+  }
+]

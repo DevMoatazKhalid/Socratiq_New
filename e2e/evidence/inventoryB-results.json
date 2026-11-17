@@ -1,0 +1,147 @@
+[
+  {
+    "name": "tab: \"Whiteboard\" shows the board",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "tab: \"Chat\" shows the conversation input and hides the board",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "tab: switching away and back keeps the drawn work (restored from the server)",
+    "ok": true,
+    "detail": "db elements=1"
+  },
+  {
+    "name": "menu: opens and lists board actions",
+    "ok": true,
+    "detail": "Save to... Export image... Ctrl+Shift+E Find on canvas Ctrl+F Help ? Reset the canvas Dark mode Shift+Alt+D Canvas background"
+  },
+  {
+    "name": "menu: contains no third-party social links (GitHub / Follow us / Discord)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "menu: \"Export image…\" opens the export dialog",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "menu: \"Find on canvas\" opens the search panel",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "menu: \"Dark mode\" toggles the theme",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "menu: \"Reset the canvas\" asks for confirmation before destroying work",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "menu: cancelling the reset leaves the work untouched",
+    "ok": true,
+    "detail": "db elements=1"
+  },
+  {
+    "name": "help: the \"?\" button opens the help dialog",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "library: the Library button opens the library sidebar (panel appears, and it was absent before)",
+    "ok": true,
+    "detail": "before=0"
+  },
+  {
+    "name": "AI bar: \"Image\" mode switches the prompt for that kind of request",
+    "ok": true,
+    "detail": "Describe an image or visual illustration to generate…"
+  },
+  {
+    "name": "AI bar: \"Simulate\" mode switches the prompt for that kind of request",
+    "ok": true,
+    "detail": "Describe a physics, math, or logic simulation to create…"
+  },
+  {
+    "name": "AI bar: \"Diagram\" mode switches the prompt for that kind of request",
+    "ok": true,
+    "detail": "Ask AI to draw a diagram… (uses selected items)"
+  },
+  {
+    "name": "AI bar: submit is disabled while the prompt is empty",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "AI bar: Enter submits the prompt and reaches a real backend route",
+    "ok": true,
+    "detail": "[\"200 /smartboard/generate-diagram\"]"
+  },
+  {
+    "name": "quick actions: \"Explain this\" and \"Check my work\" each send a request to the Coach",
+    "ok": true,
+    "detail": "{\"menuNames\":[\"Explain this\",\"Check my work\"],\"posts\":[\"200 /ai/coach/stream\",\"200 /ai/coach/stream\"]}"
+  },
+  {
+    "name": "chat bar: sending a message reaches the Coach route",
+    "ok": true,
+    "detail": "[\"200 /ai/coach/stream\"]"
+  },
+  {
+    "name": "simulation panel: \"Reload\" restarts the simulation from zero",
+    "ok": true,
+    "detail": "t 1.27 -> 0.9"
+  },
+  {
+    "name": "simulation panel: \"Expand\" enlarges the panel",
+    "ok": true,
+    "detail": "560px -> 1280px"
+  },
+  {
+    "name": "simulation panel: \"Close\" removes the panel and stops the simulation",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "layout 1360px: undo/redo/zoom/help are not covered by the AI bar",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "layout 1100px: undo/redo/zoom/help are not covered by the AI bar",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "layout 900px: undo/redo/zoom/help are not covered by the AI bar",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "mobile 390px: the drawing toolbar is present",
+    "ok": true,
+    "detail": "tools=12"
+  },
+  {
+    "name": "mobile touch: a finger-drawn stroke is created and saved to the database",
+    "ok": true,
+    "detail": "elements=1"
+  },
+  {
+    "name": "mobile 390px: the AI bar and chat input are reachable",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "mobile 390px: no horizontal page overflow",
+    "ok": true,
+    "detail": ""
+  }
+]

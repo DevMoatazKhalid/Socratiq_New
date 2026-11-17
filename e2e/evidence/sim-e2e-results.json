@@ -1,0 +1,172 @@
+{
+  "browser": "Chromium 131 headless (@sparticuz/chromium) with web security, site isolation and multi-process ON",
+  "cdnReachable": false,
+  "flagsRemoved": "single-process, disable-web-security, disable-site-isolation-trials, allow-running-insecure-content, no-zygote",
+  "results": [
+    {
+      "name": "animation advances over real time",
+      "ok": true,
+      "detail": "t 0.03 -> 0.76"
+    },
+    {
+      "name": "the bob is really drawn and MOVES on the canvas",
+      "ok": true,
+      "detail": "bob x 147.7 -> 119.9"
+    },
+    {
+      "name": "slider changes the model (period recomputed)",
+      "ok": true,
+      "detail": "period 2.18 -> 2.81"
+    },
+    {
+      "name": "pause stops time",
+      "ok": true,
+      "detail": "t 1.63 -> 1.63"
+    },
+    {
+      "name": "resume continues time",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "reset restarts the simulation",
+      "ok": true,
+      "detail": "t after reset 0.08"
+    },
+    {
+      "name": "escape attempt blocked: parentDoc",
+      "ok": true,
+      "detail": "parentDoc=blocked:SecurityError"
+    },
+    {
+      "name": "escape attempt blocked: topDoc",
+      "ok": true,
+      "detail": "topDoc=blocked:SecurityError"
+    },
+    {
+      "name": "escape attempt blocked: localStorage",
+      "ok": true,
+      "detail": "localStorage=blocked:SecurityError"
+    },
+    {
+      "name": "escape attempt blocked: cookie",
+      "ok": true,
+      "detail": "cookie=blocked:SecurityError"
+    },
+    {
+      "name": "escape attempt blocked: indexedDB",
+      "ok": true,
+      "detail": "indexedDB=blocked:SecurityError"
+    },
+    {
+      "name": "escape attempt blocked: topNavigate",
+      "ok": true,
+      "detail": "topNavigate=blocked:SecurityError"
+    },
+    {
+      "name": "escape attempt blocked: popup",
+      "ok": true,
+      "detail": "popup=blocked"
+    },
+    {
+      "name": "escape attempt blocked: fetch",
+      "ok": true,
+      "detail": "fetch=blocked:TypeError"
+    },
+    {
+      "name": "escape attempt blocked: img",
+      "ok": true,
+      "detail": "img=blocked"
+    },
+    {
+      "name": "escape attempt blocked: script",
+      "ok": true,
+      "detail": "script=blocked"
+    },
+    {
+      "name": "escape attempt blocked: ws",
+      "ok": true,
+      "detail": "ws=blocked"
+    },
+    {
+      "name": "parent page was not navigated by the sandboxed frame",
+      "ok": true,
+      "detail": "about:blank"
+    },
+    {
+      "name": "no popup window was opened",
+      "ok": true,
+      "detail": "open pages: 1"
+    },
+    {
+      "name": "NOTHING reached the network listener (fetch/img/script/ws/form/nav/popup)",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "CONTROL (CSP stripped): the same attack DOES reach the network, so the CSP is what blocks it",
+      "ok": true,
+      "detail": "reached: [\"/fetch\",\"/img.png\",\"/x.js\",\"/ws\"]"
+    },
+    {
+      "name": "CONTROL (CSP stripped): the sandbox attribute alone still blocks parent/storage/cookie access",
+      "ok": true,
+      "detail": "parentDoc=blocked:SecurityError | topDoc=blocked:SecurityError | localStorage=blocked:SecurityError | cookie=blocked:SecurityError"
+    },
+    {
+      "name": "control: an UN-sandboxed page can reach the listener (so the zero above is meaningful)",
+      "ok": true,
+      "detail": "[\"GET /control\"]"
+    },
+    {
+      "name": "validator blocks: <script>window.parent.x</script>",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "validator blocks: <script>localStorage.a=1</script>",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "validator blocks: <meta http-equiv=refresh content=\"0;url=",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "validator blocks: <iframe src=x></iframe>",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "validator blocks: <script>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "CONTROL: parent ticks normally with a well-behaved simulation",
+      "ok": true,
+      "detail": "ticks 9 -> 25"
+    },
+    {
+      "name": "runaway while(true) in a script no longer freezes the tab (loop guard)",
+      "ok": true,
+      "detail": "parent ticks 4 -> 19  (-1 = tab stopped responding)"
+    },
+    {
+      "name": "runaway for(;;) no longer freezes the tab",
+      "ok": true,
+      "detail": "parent ticks 4 -> 19"
+    },
+    {
+      "name": "runaway loop inside an inline onclick handler no longer freezes the tab",
+      "ok": true,
+      "detail": "parent ticks 4 -> 19"
+    },
+    {
+      "name": "a legitimate per-frame loop keeps running past the guard limit (no false positive)",
+      "ok": true,
+      "detail": "frames 81 -> 214 over ~2.2s, longer than the 1500ms limit"
+    }
+  ]
+}

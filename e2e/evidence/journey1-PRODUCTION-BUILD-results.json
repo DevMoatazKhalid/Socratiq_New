@@ -1,0 +1,77 @@
+[
+  {
+    "name": "drawn rectangle is persisted in the database",
+    "ok": true,
+    "detail": "[\"rectangle\",\"freedraw\",\"text\"]"
+  },
+  {
+    "name": "drawn freehand stroke is persisted (with real points)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "typed text is persisted with the typed content",
+    "ok": true,
+    "detail": "[\"2x + 4 = 10\"]"
+  },
+  {
+    "name": "hand-drawn elements are stamped as student-authored (or unstamped)",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "the server revision advanced (save confirmed by the database)",
+    "ok": true,
+    "detail": "scene_rev=6"
+  },
+  {
+    "name": "client sent base_rev with its saves",
+    "ok": true,
+    "detail": "puts=6 base_revs=0,1,2,3,4,5"
+  },
+  {
+    "name": "the UI says Saved only after that",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "diagram request reached the real backend route and succeeded",
+    "ok": true,
+    "detail": "[\"200 generate-diagram\"]"
+  },
+  {
+    "name": "diagram text labels are persisted (Start / Valid? / Home / Retry)",
+    "ok": true,
+    "detail": "[\"2x + 4 = 10\",\"Start\",\"Valid?\",\"Home\",\"Retry\",\"yes\",\"no\"]"
+  },
+  {
+    "name": "diagram is marked AI-generated, distinct from student work",
+    "ok": true,
+    "detail": "[null,\"ai\"]"
+  },
+  {
+    "name": "diagram arrows are bound to nodes (editable connectors)",
+    "ok": true,
+    "detail": "arrows=3"
+  },
+  {
+    "name": "every persisted diagram arrow starts and ends ON the shapes it connects (none ends in empty space)",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "after reload the server returns the saved scene (same element count)",
+    "ok": true,
+    "detail": "16 vs 16"
+  },
+  {
+    "name": "the board re-renders content after reload (screenshot taken)",
+    "ok": true,
+    "detail": "canvas=[1072,695]"
+  },
+  {
+    "name": "no uncaught page errors during the journey",
+    "ok": true,
+    "detail": ""
+  }
+]

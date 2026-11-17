@@ -1,0 +1,11 @@
+import { launch, signedInContext, WEB, sleep } from './lib.mjs'
+const b = await launch(); const ctx = await signedInContext(b, 'S1'); const page = await ctx.newPage()
+await page.goto(WEB + '/student/courses/C1/assignments/A1/coach', { waitUntil: 'domcontentloaded' }); await sleep(3500)
+await page.locator('button:has-text("Whiteboard")').first().click(); await sleep(6500)
+await page.locator('button:has-text("Fit to")').first().click().catch(() => {}); await sleep(800)
+await page.screenshot({ path: 'evidence/explore-card-fit.png' })
+console.log('iframes before', (await page.$$('iframe')).length)
+await page.mouse.click(1000, 650); await page.keyboard.press('Control+a'); await sleep(1500)
+console.log('after ctrl+a iframes', (await page.$$('iframe')).length)
+await page.screenshot({ path: 'evidence/explore-card-selected-all.png' })
+await b.close()

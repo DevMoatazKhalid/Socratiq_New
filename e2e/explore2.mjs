@@ -1,0 +1,11 @@
+import { launch, signedInContext, WEB, sleep } from './lib.mjs'
+const b = await launch(); const ctx = await signedInContext(b, 'S1'); const page = await ctx.newPage()
+await page.goto(WEB + '/student/courses/C1/assignments/A1/coach', { waitUntil: 'domcontentloaded' })
+await sleep(4000)
+await page.locator('button:has-text("Whiteboard")').first().click()
+await sleep(7000)
+await page.screenshot({ path: 'evidence/explore-board.png' })
+console.log('excalidraw canvases', await page.$$eval('canvas', c => c.length))
+console.log('TOOLS', JSON.stringify(await page.$$eval('[role=radio],[data-testid^=toolbar-],label.ToolIcon', xs => xs.map(x => (x.getAttribute('data-testid')||x.getAttribute('aria-label')||x.title||'').slice(0,40)))))
+console.log('LABELS', JSON.stringify(await page.$$eval('button', bs => bs.map(x => (x.getAttribute('aria-label')||x.title||x.textContent||'').trim().slice(0,45)).filter(Boolean))))
+await b.close()

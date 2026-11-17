@@ -1,0 +1,17 @@
+[
+  {
+    "name": "with unsaved work the page vetoes leaving (the browser will ask the user)",
+    "ok": true,
+    "detail": "badge=\"Unsaved changes\" vetoed=true"
+  },
+  {
+    "name": "once everything is saved the page does NOT nag",
+    "ok": true,
+    "detail": "badge=\"Saved 06:23 AM\" vetoed=false"
+  },
+  {
+    "name": "the saved stroke is in the database",
+    "ok": true,
+    "detail": "elements=1"
+  }
+]

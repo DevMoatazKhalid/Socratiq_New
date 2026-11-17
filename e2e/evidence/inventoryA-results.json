@@ -1,0 +1,152 @@
+[
+  {
+    "name": "toolbar: \"hand\" button activates the hand tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"rectangle\" button activates the rectangle tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"diamond\" button activates the diamond tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"ellipse\" button activates the ellipse tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"arrow\" button activates the arrow tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"line\" button activates the line tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"freedraw\" button activates the freedraw tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"text\" button activates the text tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"eraser\" button activates the eraser tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"selection\" button activates the selection tool",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "toolbar: \"lock\" button toggles keep-tool-active mode on and off",
+    "ok": true,
+    "detail": "on=true off=true"
+  },
+  {
+    "name": "draw: the rectangle tool creates a rectangle and it is saved to the database",
+    "ok": true,
+    "detail": "rectangle"
+  },
+  {
+    "name": "draw: the diamond tool creates a diamond and it is saved to the database",
+    "ok": true,
+    "detail": "diamond"
+  },
+  {
+    "name": "draw: the ellipse tool creates a ellipse and it is saved to the database",
+    "ok": true,
+    "detail": "ellipse"
+  },
+  {
+    "name": "draw: the arrow tool creates a arrow and it is saved to the database",
+    "ok": true,
+    "detail": "arrow"
+  },
+  {
+    "name": "draw: the line tool creates a line and it is saved to the database",
+    "ok": true,
+    "detail": "line"
+  },
+  {
+    "name": "draw: the freedraw tool creates a freedraw and it is saved to the database",
+    "ok": true,
+    "detail": "freedraw"
+  },
+  {
+    "name": "draw: the text tool creates a text and it is saved to the database",
+    "ok": true,
+    "detail": "text"
+  },
+  {
+    "name": "draw: typed text content is stored exactly",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "draw: nothing drawn by the student is marked as AI or Coach work",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "style: choosing red in the style panel colours the next rectangle red",
+    "ok": true,
+    "detail": "#e03131"
+  },
+  {
+    "name": "select+drag: moving an element updates its position in the saved scene",
+    "ok": true,
+    "detail": "Δ=(50,38)"
+  },
+  {
+    "name": "copy/paste: Ctrl+C then Ctrl+V adds a copy",
+    "ok": true,
+    "detail": "8 -> 9"
+  },
+  {
+    "name": "delete: the Delete key removes the selection",
+    "ok": true,
+    "detail": "now 8"
+  },
+  {
+    "name": "undo button: restores the deleted element",
+    "ok": true,
+    "detail": "now 9"
+  },
+  {
+    "name": "redo button: re-applies the deletion",
+    "ok": true,
+    "detail": "now 8"
+  },
+  {
+    "name": "Ctrl+Z works as undo too",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "eraser: dragging across a stroke deletes it",
+    "ok": true,
+    "detail": "1 -> 0"
+  },
+  {
+    "name": "zoom: + increases, − decreases, reset returns to 100%",
+    "ok": true,
+    "detail": "100% -> 110% -> 90% -> 100%"
+  },
+  {
+    "name": "navigation: \"Fit to content\" changes the view and \"Reset view\" returns to 100%",
+    "ok": true,
+    "detail": "fit=100% reset=100%"
+  }
+]
