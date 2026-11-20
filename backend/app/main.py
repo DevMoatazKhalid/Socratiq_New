@@ -20,7 +20,8 @@ from .files.errors import FileRejected
 from .files.pipeline import FilePipeline
 from .files.storage import LocalObjectStorage, build_storage
 from .files.worker import IngestWorker
-from .routers import ai, auth_users, files, health, smartboard, student, teacher, verification
+from .code_runner import build_code_service
+from .routers import ai, auth_users, code, files, health, notes, smartboard, student, teacher, verification
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("socratiq")
@@ -44,7 +45,7 @@ class _Lazy:
 
 
 def create_app(*, db: Optional[Database] = None, storage: Any = None, token_verifier: Any = None, ai_adapter: Any = None, rag: Any = None,
-               run_worker: Optional[bool] = None) -> FastAPI:
+               run_worker: Optional[bool] = None, code_runner: Any = None) -> FastAPI:
     cfg = get_backend_config()
     problems = cfg.validate() if db is None else []
     if problems:
@@ -97,6 +98,7 @@ def create_app(*, db: Optional[Database] = None, storage: Any = None, token_veri
     app.state.db, app.state.storage, app.state.pipeline, app.state.worker = _db, _storage, pipeline, worker
     app.state.token_verifier = token_verifier or _Lazy(make_verifier)
     app.state.ai = ai_adapter or _Lazy(make_ai)
+    app.state.code_service = build_code_service(cfg, code_runner)     # student code runs in the isolated runner service, never in this process
 
     if cfg.is_production and "*" in cfg.cors_origins:
         raise RuntimeError("CORS_ORIGINS must list explicit origins in production")
@@ -145,7 +147,7 @@ def create_app(*, db: Optional[Database] = None, storage: Any = None, token_veri
         return _err(request, 500, "Something went wrong on our side.", "internal_error")     # never leak internals
 
     app.include_router(health.router)
-    for r in (auth_users.router, files.router, student.router, verification.router, ai.router, teacher.router, smartboard.router):
+    for r in (auth_users.router, files.router, student.router, notes.router, code.router, verification.router, ai.router, teacher.router, smartboard.router):
         app.include_router(r, prefix="/api/v1")
     return app
 

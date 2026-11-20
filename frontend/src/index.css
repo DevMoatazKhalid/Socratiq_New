@@ -139,3 +139,25 @@ html { scroll-behavior: auto; }
 @keyframes sb-appear { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .sb-appear { animation: sb-appear 0.5s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .sb-appear { animation: none; } }
+
+/* My Notes: rendered Markdown preview (react-markdown, raw HTML skipped). */
+.notes-markdown > * + * { margin-top: 0.6em; }
+.notes-markdown h1 { font-size: 1.25rem; font-weight: 700; }
+.notes-markdown h2 { font-size: 1.1rem; font-weight: 700; }
+.notes-markdown h3 { font-size: 1rem; font-weight: 600; }
+.notes-markdown ul { list-style: disc; padding-inline-start: 1.25rem; }
+.notes-markdown ol { list-style: decimal; padding-inline-start: 1.25rem; }
+.notes-markdown a { text-decoration: underline; text-underline-offset: 3px; }
+.notes-markdown blockquote { border-inline-start: 3px solid var(--color-border-strong); padding-inline-start: 0.75rem; color: var(--color-ink-soft); }
+.notes-markdown code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; background: rgb(0 0 0 / 0.06); border-radius: 4px; padding: 0.05em 0.3em; }
+.notes-markdown pre { direction: ltr; overflow-x: auto; background: rgb(0 0 0 / 0.06); border-radius: var(--radius-md); padding: 0.75rem; }
+.notes-markdown pre code { background: none; padding: 0; }
+
+/* In-chat code runner: syntax colours (kept within the design system's palette, AA on the code background). */
+.tok-keyword { color: #8a3d12; font-weight: 600; }
+.tok-string { color: var(--color-success-ink); }
+.tok-comment { color: var(--color-ink-muted); font-style: italic; }
+.tok-number { color: var(--color-warning-ink); }
+.tok-builtin { color: #5a4c06; }
+.tok-def { color: var(--color-ink); font-weight: 600; }
+.tok-decorator { color: #6b4fa0; }

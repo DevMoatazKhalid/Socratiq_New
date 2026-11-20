@@ -18,6 +18,8 @@ import { PersonaSelector } from "@/components/socratiq/PersonaSelector"
 import { ResizableSplit } from "@/components/socratiq/ResizableSplit"
 import { useMediaQuery } from "@/lib/useMediaQuery"
 import { RichText } from "@/components/ui/RichText"
+import { RunnableCodeBlock } from "@/components/socratiq/RunnableCodeBlock"
+import { SaveToNotesButton } from "@/components/notes/SaveToNotesButton"
 import { Maximize2, MessageSquare, Mic, Minimize2, PenLine, Send, Square, Volume2, VolumeX } from "lucide-react"
 
 type VisualState = { kind: "diagram" | "simulation"; state: "pending" | "placed" | "failed" }
@@ -277,7 +279,7 @@ export default function AiCoach() {
         <p className="text-center text-sm text-[var(--color-ink-muted)]">Tell SocratiQ where you're stuck, or paste what you've tried so far.</p>
       )}
       {messages.map((m) => (
-        <Bubble key={m.id} message={m} onViewBoard={showBoard} />
+        <Bubble key={m.id} message={m} onViewBoard={showBoard} topic={assignmentQ.data?.topic || assignmentQ.data?.title} />
       ))}
       {thinking && !streaming && (
         <div className="flex justify-start">
@@ -449,9 +451,10 @@ export default function AiCoach() {
   )
 }
 
-function Bubble({ message, onViewBoard }: { message: Local; onViewBoard: () => void }) {
+function Bubble({ message, onViewBoard, topic }: { message: Local; onViewBoard: () => void; topic?: string }) {
   const isStudent = message.role === "student"
   const cites = (message.sources ?? []).filter((s) => s.documentTitle)
+  const final = !isStudent && !message.id.startsWith("streaming-")          // a reply still arriving is not runnable or saveable yet
   return (
     <div className={cn("flex", isStudent ? "justify-end" : "justify-start")}>
       <div
@@ -460,7 +463,11 @@ function Bubble({ message, onViewBoard }: { message: Local; onViewBoard: () => v
           isStudent ? "bg-[var(--color-teal-light)] text-[var(--color-ink)]" : "bg-[var(--color-surface-muted)] text-[var(--color-ink)]"
         )}
       >
-        <RichText text={message.content} detectCode={isStudent} />
+        <RichText
+          text={message.content}
+          detectCode={isStudent}
+          renderCodeBlock={final ? (code, lang, i) => <RunnableCodeBlock code={code} lang={lang} blockKey={`${message.id}:${i}`} /> : undefined}
+        />
         {!isStudent && message.boardCount ? (
           <button type="button" onClick={onViewBoard} className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-teal-dark)]/30 bg-white px-2.5 py-1 text-xs font-medium text-[var(--color-teal-dark)] hover:bg-[var(--color-teal-light)]">
             <PenLine className="h-3.5 w-3.5" aria-hidden="true" />Wrote {message.boardCount} {message.boardCount === 1 ? "item" : "items"} on the board · View board
@@ -480,6 +487,7 @@ function Bubble({ message, onViewBoard }: { message: Local; onViewBoard: () => v
             From course material: {cites.map((s) => `${s.documentTitle}${s.pageNumber ? ` (p. ${s.pageNumber})` : ""}`).join(", ")}
           </p>
         )}
+        {final && message.content.trim() && <SaveToNotesButton messageId={message.id} content={message.content} topic={topic} />}
       </div>
     </div>
   )

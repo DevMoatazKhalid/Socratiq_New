@@ -165,3 +165,53 @@ class VerificationAnswerIn(Strict):
 
 class EnrollmentPatch(Strict):
     status: Literal["active", "inactive"]
+
+
+class StrictRaw(BaseModel):
+    """Like Strict, but text is kept byte-for-byte (code indentation, trailing newlines and Markdown spacing are meaningful)."""
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
+
+
+# ---------------------------------------------------------------- student notes
+NOTE_ID = r"^note_[0-9a-f]{32}$"
+NOTE_TITLE_MAX, NOTE_CONTENT_MAX = 200, 100_000
+
+
+class NoteCreateIn(StrictRaw):
+    # Chosen by the client BEFORE the first save, so a retried create is idempotent: the same id can never become two notes.
+    id: str = Field(pattern=NOTE_ID)
+    title: str = Field(default="", max_length=NOTE_TITLE_MAX)
+    content: str = Field(default="", max_length=NOTE_CONTENT_MAX)
+    # "Save to Notes" on a Coach reply: the interaction it came from. Saving the same reply again returns the existing note.
+    source_kind: Optional[Literal["coach_message"]] = None
+    source_ref: Optional[str] = Field(default=None, min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_:.-]+$")
+
+    @model_validator(mode="after")
+    def _source_pair(self):
+        if (self.source_kind is None) != (self.source_ref is None):
+            raise ValueError("source_kind and source_ref go together")
+        return self
+
+
+class NotePatchIn(StrictRaw):
+    base_version: int = Field(ge=1, le=2_000_000_000)      # the version the client's text is based on (optimistic concurrency)
+    title: Optional[str] = Field(default=None, max_length=NOTE_TITLE_MAX)
+    content: Optional[str] = Field(default=None, max_length=NOTE_CONTENT_MAX)
+
+    @model_validator(mode="after")
+    def _something(self):
+        if self.title is None and self.content is None:
+            raise ValueError("nothing to update")
+        return self
+
+
+# ---------------------------------------------------------------- in-chat code runner
+CODE_SOURCE_MAX, CODE_STDIN_MAX = 20_000, 16_000
+
+
+class CodeRunIn(StrictRaw):
+    # Chosen by the client for this run so it can cancel it while the request is still open. Scoped to the student: never shared.
+    run_id: str = Field(pattern=r"^[A-Za-z0-9_-]{8,64}$")
+    language: str = Field(min_length=1, max_length=20, pattern=r"^[a-z0-9+#]+$")
+    source: str = Field(min_length=1, max_length=CODE_SOURCE_MAX)
+    stdin: str = Field(default="", max_length=CODE_STDIN_MAX)

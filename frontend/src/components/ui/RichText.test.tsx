@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 afterEach(cleanup)
 import { RichText } from "./RichText"
@@ -39,5 +39,28 @@ describe("RichText direction (Arabic learning content inside an English LTR app)
   it("keeps code blocks LTR even when the surrounding text is Arabic", () => {
     const { container } = render(<RichText text={"اشرح\n```py\nx=1\n```"} />)
     expect(container.querySelector("pre")!.getAttribute("dir")).toBe("ltr")
+  })
+})
+
+describe("RichText code-block renderer (in-chat code runner hook)", () => {
+  it("passes each fenced block's code, fence tag and index to the renderer and keeps the prose around it", () => {
+    const seen: [string, string, number][] = []
+    const { container } = render(
+      <RichText text={"Try:\n```Python\nprint(1)\n```\nthen\n```\nplain\n```\nend"} renderCodeBlock={(code, lang, i) => { seen.push([code, lang, i]); return <div data-testid={`blk${i}`}>{code}</div> }} />,
+    )
+    expect(seen).toEqual([["print(1)", "python", 0], ["plain", "", 1]])
+    expect(container.querySelector("pre")).toBeNull()
+    expect(container.textContent).toContain("Try:")
+    expect(container.textContent).toContain("then")
+    expect(container.textContent).toContain("end")
+  })
+  it("without a renderer, fenced blocks render exactly as before", () => {
+    const { container } = render(<RichText text={"a\n```js\nx()\n```"} />)
+    expect(container.querySelector("pre code")?.textContent).toBe("x()")
+  })
+  it("an unfinished fence (still streaming) stays text and never reaches the renderer", () => {
+    const fn = vi.fn()
+    render(<RichText text={"```py\nprint(1)"} renderCodeBlock={fn} />)
+    expect(fn).not.toHaveBeenCalled()
   })
 })

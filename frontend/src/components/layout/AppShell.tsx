@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth"
 import { useCourses } from "@/lib/queries"
 import type { Role } from "@/types"
 import { cn } from "@/lib/utils"
+import { NotesButton } from "@/components/notes/NotesButton"
 
 /** Height of the visual viewport (shrinks when a phone keyboard opens, which `100dvh` alone does not on iOS Safari). Null until measured / unsupported. */
 function useVisualViewportHeight(enabled: boolean): number | null {
@@ -57,7 +58,8 @@ export function AppShell({
       </a>
       <Sidebar role={role} userName={me?.name ?? ""} userEmail={me?.email ?? ""} courses={courses} open={open} onClose={() => setOpen(false)} onSignOut={signOut} />
       <div className={cn("flex min-w-0 flex-1 flex-col", fitViewport && "min-h-0")}>
-        <PageHeader crumbs={crumbs} search={search} onMenuClick={() => setOpen(true)} right={headerRight} />
+        <PageHeader crumbs={crumbs} search={search} onMenuClick={() => setOpen(true)}
+          right={role === "student" ? <>{headerRight}<NotesButton /></> : headerRight} />
         <main id="main" className={cn("flex-1", fitViewport && "flex min-h-0 flex-col overflow-hidden", mainClassName ?? "p-4 lg:p-8")}>{children}</main>
       </div>
     </div>

@@ -57,7 +57,7 @@ def ids(conn, sql, *params):
 # ------------------------------------------------------------------ deployability / idempotency
 def test_all_migrations_applied_and_tracked(db):
     names = ids(db, "select filename from schema_migrations")
-    assert names[0].startswith("000_") and names[-1].startswith("017_") and len(names) == 18
+    assert names[0].startswith("000_") and names[-1].startswith("018_") and len(names) == 19
 
 
 def _fingerprint(conn):
@@ -425,3 +425,80 @@ def test_students_cannot_write_their_own_grade_or_whiteboard_through_the_data_ap
     assert float(db.execute("SELECT score FROM submissions WHERE submission_id='SUBX'").fetchone()[0]) == 8
     assert db.execute("SELECT feedback FROM submissions WHERE submission_id='SUBX'").fetchone()[0] == "private feedback"
     assert db.execute("SELECT whiteboard->'steps'->>0 FROM attempts WHERE attempt_id='T1'").fetchone()[0] == "x = 7"
+
+
+# ------------------------------------------------------------------ student notes (migration 018): ownership, tenant integrity, duplicates, RLS, reversibility
+N = lambda c: "note_" + c * 32   # noqa: E731
+
+
+def _seed(db):
+    db.execute("INSERT INTO student_notes (note_id, student_id, university_id, title, content) VALUES (%s,'S1','U1','mine','a'),(%s,'S2','U1','theirs','b'),(%s,'S3','U2','u2','c')",
+               (N("a"), N("b"), N("c")))
+
+
+def test_notes_belong_to_one_student_of_the_same_university(db):
+    with pytest.raises(E.ForeignKeyViolation):
+        db.execute("INSERT INTO student_notes (note_id, student_id, university_id) VALUES (%s,'S1','U2')", (N("d"),))
+    with pytest.raises(E.ForeignKeyViolation):
+        db.execute("INSERT INTO student_notes (note_id, student_id, university_id) VALUES (%s,'P1','U1')", (N("d"),))   # professors are not students
+    with pytest.raises(E.CheckViolation):
+        db.execute("INSERT INTO student_notes (note_id, student_id, university_id) VALUES ('note_1','S1','U1')")
+
+
+def test_saving_the_same_coach_reply_twice_is_impossible(db):
+    db.execute("INSERT INTO student_notes (note_id, student_id, university_id, source_kind, source_ref) VALUES (%s,'S1','U1','coach_message','I1')", (N("e"),))
+    with pytest.raises(E.UniqueViolation):
+        db.execute("INSERT INTO student_notes (note_id, student_id, university_id, source_kind, source_ref) VALUES (%s,'S1','U1','coach_message','I1')", (N("f"),))
+    db.execute("INSERT INTO student_notes (note_id, student_id, university_id, source_kind, source_ref) VALUES (%s,'S2','U1','coach_message','I1')", (N("f"),))
+
+
+def test_data_api_reads_only_own_notes_and_cannot_write(db):
+    _seed(db)
+    for who, mine in (("S1", [N("a")]), ("S2", [N("b")]), ("S3", [N("c")]), ("P1", [])):
+        with as_user(db, who):
+            assert [r[0] for r in db.execute("SELECT note_id FROM student_notes ORDER BY 1")] == mine, who
+    with as_user(db, "S1"):
+        for sql in ("INSERT INTO student_notes (note_id, student_id, university_id) VALUES ('" + N("9") + "','S1','U1')",
+                    "UPDATE student_notes SET content='x'", "DELETE FROM student_notes"):
+            with pytest.raises(E.InsufficientPrivilege):
+                db.execute(sql)
+    with as_user(db, None, role="anon"):
+        with pytest.raises(E.InsufficientPrivilege):
+            db.execute("SELECT 1 FROM student_notes")
+
+
+def test_write_policies_are_ownership_strict_even_if_writes_were_ever_granted(db):
+    _seed(db)
+    db.execute("BEGIN")
+    try:
+        db.execute("GRANT INSERT, UPDATE, DELETE ON student_notes TO authenticated")
+        db.execute("SET LOCAL ROLE authenticated")
+        db.execute("SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true)")
+        assert db.execute("UPDATE student_notes SET content='x' WHERE note_id=%s", (N("b"),)).rowcount == 0
+        assert db.execute("DELETE FROM student_notes WHERE note_id=%s", (N("b"),)).rowcount == 0
+        db.execute("SAVEPOINT s")
+        with pytest.raises(E.InsufficientPrivilege):
+            db.execute("INSERT INTO student_notes (note_id, student_id, university_id) VALUES (%s,'S2','U1')", (N("9"),))
+        db.execute("ROLLBACK TO SAVEPOINT s")
+        with pytest.raises(E.InsufficientPrivilege):
+            db.execute("UPDATE student_notes SET student_id='S2' WHERE note_id=%s", (N("a"),))
+    finally:
+        db.execute("ROLLBACK")
+    assert db.execute("SELECT content FROM student_notes WHERE note_id=%s", (N("b"),)).fetchone()[0] == "b"
+
+
+def test_updated_at_moves_and_deleting_a_student_removes_their_notes(db):
+    _seed(db)
+    db.execute("UPDATE student_notes SET updated_at = now() - interval '1 day' WHERE note_id=%s", (N("a"),))
+    db.execute("UPDATE student_notes SET content='new' WHERE note_id=%s", (N("a"),))
+    assert db.execute("SELECT updated_at > now() - interval '1 minute' FROM student_notes WHERE note_id=%s", (N("a"),)).fetchone()[0]
+
+
+def test_down_migration_removes_only_the_notes_table_and_018_can_be_reapplied(db):
+    _seed(db)
+    before = db.execute("SELECT count(*) FROM students").fetchone()[0]
+    db.execute((dbtools.run_migrations.MIGRATIONS_DIR / "down" / "018_student_notes.down.sql").read_text())
+    assert db.execute("SELECT to_regclass('public.student_notes')").fetchone()[0] is None
+    assert db.execute("SELECT count(*) FROM students").fetchone()[0] == before
+    assert dbtools.run_migrations.run(dbtools.url_for(db.info.dbname)) == ["018_student_notes.sql"]
+    assert db.execute("SELECT count(*) FROM pg_policies WHERE tablename='student_notes'").fetchone()[0] == 4

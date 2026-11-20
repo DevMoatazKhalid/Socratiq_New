@@ -25,19 +25,23 @@ function CodeBlock({ code }: { code: string }) {
 }
 
 
-export function RichText({ text, detectCode = false }: { text: string; detectCode?: boolean }) {
+/** Renders one fenced block instead of the default <pre>. `lang` is the fence tag ("py", "python", "" when none); `index` counts blocks from 0. */
+export type CodeBlockRenderer = (code: string, lang: string, index: number) => ReactNode
+
+export function RichText({ text, detectCode = false, renderCodeBlock }: { text: string; detectCode?: boolean; renderCodeBlock?: CodeBlockRenderer }) {
   if (detectCode && looksLikeCode(text)) return <CodeBlock code={text} />
-  const segments = text.split(/```[^\n`]*\n?([\s\S]*?)```/g)
-  // split with one capture group alternates: prose, code, prose, code, ...
-  return (
-    <>
-      {segments.map((seg, i) =>
-        i % 2 === 1 ? (
-          <CodeBlock key={i} code={seg.replace(/\n$/, "")} />
-        ) : seg ? (
-          <p key={i} dir="auto" className="whitespace-pre-wrap [overflow-wrap:anywhere]">{inline(seg)}</p>
-        ) : null
-      )}
-    </>
-  )
+  const parts = text.split(/```([^\n`]*)\n?([\s\S]*?)```/g)
+  // split with two capture groups cycles: prose, fence tag, code, prose, fence tag, code, ..., prose
+  const out: ReactNode[] = []
+  for (let i = 0; i < parts.length; i += 3) {
+    const prose = parts[i]
+    if (prose) out.push(<p key={`p${i}`} dir="auto" className="whitespace-pre-wrap [overflow-wrap:anywhere]">{inline(prose)}</p>)
+    if (i + 2 < parts.length) {
+      const lang = (parts[i + 1] ?? "").trim().toLowerCase()
+      const code = (parts[i + 2] ?? "").replace(/\n$/, "")
+      const block = i / 3
+      out.push(<Fragment key={`c${i}`}>{renderCodeBlock ? renderCodeBlock(code, lang, block) : <CodeBlock code={code} />}</Fragment>)
+    }
+  }
+  return <>{out}</>
 }

@@ -94,6 +94,22 @@ class BackendConfig:
         self.coach_history_window: int = _int("COACH_HISTORY_WINDOW", 10, 1)
         self.upload_rate_limit_per_minute: int = _int("UPLOAD_RATE_LIMIT_PER_MINUTE", 30, 1)
 
+        # --- In-chat code runner. Student code NEVER runs in this process: it is sent to the isolated runner service
+        # (sandbox/code_runner, see docs/CODE_RUNNER.md). Unset URL = the feature is off and the UI shows no Run buttons.
+        self.code_runner_url: Optional[str] = (_clean("CODE_RUNNER_URL") or "").rstrip("/") or None
+        token = _clean("CODE_RUNNER_TOKEN")
+        token_file = _clean("CODE_RUNNER_TOKEN_FILE")
+        if not token and token_file and Path(token_file).is_file():
+            token = Path(token_file).read_text(encoding="utf-8").strip() or None
+        self.code_runner_token: Optional[str] = token
+        # Server-side limits for every run. The browser cannot change them, and the runner clamps them again to its own maxima.
+        self.code_runner_timeout_ms: int = _int("CODE_RUNNER_TIMEOUT_MS", 5000, 500)
+        self.code_runner_memory_mb: int = _int("CODE_RUNNER_MEMORY_MB", 256, 32)
+        self.code_runner_output_bytes: int = _int("CODE_RUNNER_OUTPUT_BYTES", 64 * 1024, 1024)
+        self.code_run_rate_limit_per_minute: int = _int("CODE_RUN_RATE_LIMIT_PER_MINUTE", 12, 1)
+        # Development only: accept a runner started without uid separation (RUNNER_ALLOW_INSECURE_DEV on the runner). Refused in production.
+        self.code_runner_allow_insecure: bool = (_clean("CODE_RUNNER_ALLOW_INSECURE_DEV") or "false").lower() in ("1", "true", "yes")
+
     # ------------------------------------------------------------------
     @property
     def is_production(self) -> bool:
@@ -141,6 +157,13 @@ class BackendConfig:
             problems.append("STORAGE_BACKEND must be 'supabase' or 'local'")
         if self.db_pool_min > self.db_pool_max:
             problems.append("DB_POOL_MIN must be <= DB_POOL_MAX")
+        if self.code_runner_url:
+            if not self.code_runner_url.startswith(("http://", "https://")):
+                problems.append("CODE_RUNNER_URL must be an http(s) URL")
+            if not self.code_runner_token or len(self.code_runner_token) < 32:
+                problems.append("CODE_RUNNER_TOKEN (or CODE_RUNNER_TOKEN_FILE) of at least 32 characters is required when CODE_RUNNER_URL is set")
+        if self.code_runner_timeout_ms > 15000:
+            problems.append("CODE_RUNNER_TIMEOUT_MS must be <= 15000")
         if self.is_production:
             if not (self.supabase_url and self.supabase_service_role_key):
                 problems.append("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required in production (Auth)")
@@ -148,6 +171,8 @@ class BackendConfig:
                 problems.append("CORS_ORIGINS must list explicit origins in production (no '*')")
             if self.storage_backend == "local":
                 problems.append("STORAGE_BACKEND=local is not allowed in production; use Supabase Storage")
+            if self.code_runner_allow_insecure:
+                problems.append("CODE_RUNNER_ALLOW_INSECURE_DEV must be off in production (it accepts a runner without uid separation)")
             if self.public_demo_voice:
                 problems.append("SMARTBOARD_PUBLIC_DEMO_VOICE must be off in production (it opens unauthenticated Gemini Live sessions)")
         return problems

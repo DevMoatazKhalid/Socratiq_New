@@ -12,7 +12,7 @@ def test_migration_order():
         "000_extensions.sql","001_rag_pgvector_schema.sql","002_core_university_schema.sql",
         "003_learning_workflow_schema.sql","004_ai_coach_schema.sql","005_verification_schema.sql",
         "006_learning_evidence_schema.sql","007_rls.sql","008_indexes_triggers.sql",
-        "009_tenant_integrity.sql","010_domain_lifecycle.sql","011_file_pipeline.sql","012_indexes.sql","013_rls.sql","014_grading.sql","015_whiteboard.sql","016_whiteboard_scene.sql","017_teaching_personas.sql"]
+        "009_tenant_integrity.sql","010_domain_lifecycle.sql","011_file_pipeline.sql","012_indexes.sql","013_rls.sql","014_grading.sql","015_whiteboard.sql","016_whiteboard_scene.sql","017_teaching_personas.sql","018_student_notes.sql"]
 
 def test_rag_contract():
     s = read("001_rag_pgvector_schema.sql")
@@ -69,3 +69,19 @@ def test_whiteboard_scene_migration_only_raises_the_cap_and_is_idempotent():
     assert "CREATE TABLE" not in s and "DELETE" not in s.upper() and "UPDATE" not in s.upper() and "TRUNCATE" not in s.upper()      # no data is changed or removed
     assert "attempts_whiteboard_shape_chk" in s and "IF EXISTS (SELECT 1 FROM pg_constraint" in s     # re-runnable
     assert "<= 3500000" in s and "<= 400000" not in s
+
+
+def test_student_notes_migration_is_additive_owned_and_read_only_through_the_data_api():
+    raw = read("018_student_notes.sql")
+    s = "\n".join(l for l in raw.splitlines() if not l.strip().startswith("--"))
+    assert "CREATE TABLE IF NOT EXISTS public.student_notes" in s and s.count("CREATE TABLE") == 1
+    assert "ALTER TABLE public.student_notes ENABLE ROW LEVEL SECURITY" in s
+    assert "REFERENCES public.students (student_id, university_id) ON DELETE CASCADE" in s        # tenant integrity like 009
+    for verb in ("SELECT", "INSERT", "UPDATE", "DELETE"):                                       # strict ownership policy for every verb
+        assert re.search(rf"FOR {verb} TO authenticated\s+(USING|WITH CHECK) \(student_id = app.current_user_id\(\)", s), verb
+    assert "GRANT SELECT ON public.student_notes TO authenticated" in s
+    assert not re.search(r"GRANT\s+(ALL|INSERT|UPDATE|DELETE)", s)                               # Data API stays read-only (013)
+    for other in ("ALTER TABLE public.students", "ALTER TABLE public.users", "DROP TABLE", "TRUNCATE", "DELETE FROM", "UPDATE public."):
+        assert other not in s                                                                    # nothing existing is touched
+    down = (MIG / "down" / "018_student_notes.down.sql").read_text(encoding="utf-8")
+    assert "DROP TABLE IF EXISTS public.student_notes" in down and "students" not in down.replace("student_notes", "")

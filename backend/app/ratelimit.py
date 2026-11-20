@@ -38,6 +38,11 @@ join_rate_limit = limiter("join", lambda: 10, "Too many attempts. Please wait a 
 smartboard_rate_limit = limiter("smartboard_gen", lambda: 20, "Too many generation requests. Please wait a moment.")
 board_chat_rate_limit = limiter("board_chat", lambda: get_backend_config().ai_rate_limit_per_minute, "You're sending messages too fast. Please wait a moment.")
 
+code_run_rate_limit = limiter("code_run", lambda: get_backend_config().code_run_rate_limit_per_minute,
+                              "You're running code very quickly. Please wait a moment and try again.")
+# Notes auto-save on a debounce (about one save per second of typing at most); this only stops runaway clients.
+notes_write_rate_limit = limiter("notes_write", lambda: 240, "Your notes are saving too often. Please wait a moment.")
+
 
 def reset_limits() -> None:   # tests
     with _lock:
