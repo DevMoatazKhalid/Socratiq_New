@@ -20,12 +20,10 @@ from .db import one
 
 
 def _get_secret() -> bytes:
-    try:
-        cfg = get_backend_config()
-        secret = cfg.link_secret()
-    except Exception:
-        secret = "socratiq-smartboard-default-secret-salt"
-    return secret.encode("utf-8")
+    """The HMAC key for Coach element ids and visual grants. Resolved by config (see `BackendConfig.board_signing_key`):
+    an explicit BOARD_SIGNING_SECRET, else FILE_LINK_SECRET, else a key derived from the server-only Supabase service-role key.
+    There is deliberately NO constant fallback: a key that ships with the source code lets anyone forge Coach authorship."""
+    return get_backend_config().board_signing_key()
 
 
 def sign_coach_element_id(attempt_id: str, prefix: str = "ai") -> str:

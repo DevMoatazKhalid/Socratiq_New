@@ -27,3 +27,17 @@ describe("RichText", () => {
     expect(looksLikeCode("just a sentence\nand another")).toBe(false)
   })
 })
+
+describe("RichText direction (Arabic learning content inside an English LTR app)", () => {
+  it("gives every prose paragraph dir=auto so Arabic and English each resolve their own base direction", () => {
+    const { container } = render(<RichText text={"معدل التعلّم هو الخطوة\n\nThe learning rate is the step"} />)
+    const ps = container.querySelectorAll("p")
+    expect(ps.length).toBeGreaterThan(0)
+    ps.forEach((p) => expect(p.getAttribute("dir")).toBe("auto"))
+    expect(container.textContent).toContain("معدل التعلّم هو الخطوة")      // text and combining marks preserved byte-for-byte
+  })
+  it("keeps code blocks LTR even when the surrounding text is Arabic", () => {
+    const { container } = render(<RichText text={"اشرح\n```py\nx=1\n```"} />)
+    expect(container.querySelector("pre")!.getAttribute("dir")).toBe("ltr")
+  })
+})

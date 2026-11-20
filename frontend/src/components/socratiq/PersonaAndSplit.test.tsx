@@ -4,19 +4,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const h = vi.hoisted(() => ({
   mutate: vi.fn(),
+  refetch: vi.fn(),
   data: undefined as unknown,
+  isError: false,
 }))
-vi.mock("@/lib/queries", () => ({ usePersonas: () => ({ data: h.data }), useSetPersona: () => ({ mutate: h.mutate }) }))
+vi.mock("@/lib/queries", () => ({ usePersonas: () => ({ data: h.data, isError: h.isError, refetch: h.refetch }), useSetPersona: () => ({ mutate: h.mutate }) }))
 
 import { PersonaSelector } from "./PersonaSelector"
 import { ResizableSplit, MIN_PCT, MAX_PCT, clampPct } from "./ResizableSplit"
 
-const personas = ["socratic_guide", "patient_mentor", "practical_engineer", "critical_thinker", "visual_explorer"].map((id, i) => ({
-  id, version: 1, name: { en: ["The Socratic Guide", "The Patient Mentor", "The Practical Engineer", "The Critical Thinker", "The Visual Explorer"][i], ar: ["المرشد السقراطي", "المعلّم الصبور", "المهندس العملي", "المفكّر الناقد", "المستكشف البصري"][i] },
-  tagline: { en: "t", ar: "ت" }, description: { en: `desc ${id}`, ar: `وصف ${id}` }, tone: "x", formality: "balanced",
+const IDS = ["socratic_guide", "patient_mentor", "practical_engineer", "critical_thinker", "visual_explorer"]
+const NAMES = ["The Socratic Guide", "The Patient Mentor", "The Practical Engineer", "The Critical Thinker", "The Visual Explorer"]
+const ARABIC = ["المرشد السقراطي", "المعلّم الصبور", "المهندس العملي", "المفكّر الناقد", "المستكشف البصري"]
+const personas = IDS.map((id, i) => ({
+  id, version: 1, name: { en: NAMES[i], ar: ARABIC[i] },
+  tagline: { en: `tagline ${id}`, ar: "ت" }, description: { en: `desc ${id}`, ar: `وصف ${id}` }, tone: "calm", formality: "balanced", socratic: i % 2 ? "medium" : "high",
 }))
 
-beforeEach(() => { h.mutate.mockReset(); h.data = { personas, selected: { id: "socratic_guide", version: 1 }, default: "socratic_guide" }; localStorage.clear() })
+beforeEach(() => { h.mutate.mockReset(); h.refetch.mockReset(); h.isError = false; h.data = { personas, selected: { id: "socratic_guide", version: 1 }, default: "socratic_guide" }; localStorage.clear() })
 afterEach(cleanup)
 
 describe("PersonaSelector", () => {
@@ -26,15 +31,69 @@ describe("PersonaSelector", () => {
     expect(container.querySelector("button")).toBeNull()
   })
 
-  it("shows the current style, lists all five with both languages, and marks the selected one", () => {
+  it("shows the current style, lists all five in English only, and marks the selected one", () => {
     render(<PersonaSelector assignmentId="A1" />)
     fireEvent.click(screen.getByRole("button", { name: /Teaching style: The Socratic Guide/ }))
     const radios = screen.getAllByRole("radio")
     expect(radios).toHaveLength(5)
     expect(radios.filter((r) => r.getAttribute("aria-checked") === "true")).toHaveLength(1)
-    expect(screen.getByText("المعلّم الصبور")).toBeTruthy()
+    NAMES.forEach((n) => expect(screen.getByText(n)).toBeTruthy())
     expect(screen.getByText("desc visual_explorer")).toBeTruthy()
+    expect(screen.getByText("tagline patient_mentor")).toBeTruthy()
     expect(screen.getByText(/never changes what help is allowed/)).toBeTruthy()
+    expect(screen.getByText(/keeps your conversation, board and progress/)).toBeTruthy()
+    // the API still delivers Arabic names, but the application UI is English-only
+    expect(screen.getByRole("dialog").textContent).not.toMatch(/[\u0600-\u06FF]/)
+    expect(document.querySelector('[lang="ar"], [dir="rtl"]')).toBeNull()
+  })
+
+  it("does not rely on colour alone: the selected style carries a text badge and aria-checked", () => {
+    render(<PersonaSelector />)
+    fireEvent.click(screen.getByRole("button", { name: /Teaching style/ }))
+    expect(screen.getAllByText("Selected")).toHaveLength(1)
+    expect(screen.getByRole("radio", { name: /The Socratic Guide/ }).textContent).toContain("Selected")
+  })
+
+  it("describes how each style teaches from server fields only", () => {
+    render(<PersonaSelector />)
+    fireEvent.click(screen.getByRole("button", { name: /Teaching style/ }))
+    expect(screen.getByRole("radio", { name: /The Patient Mentor/ }).textContent).toContain("Tone: calm · Questioning: Medium")
+    expect(screen.getByRole("radio", { name: /The Socratic Guide/ }).textContent).toContain("Questioning: High")
+  })
+
+  it("an unknown or missing selected id falls back to the first listed style instead of crashing", () => {
+    h.data = { personas, selected: { id: "something_unknown", version: 9 }, default: "socratic_guide" }
+    render(<PersonaSelector />)
+    expect(screen.getByRole("button", { name: /Teaching style: The Socratic Guide/ })).toBeTruthy()
+  })
+
+  it("keyboard: focus lands on the active style, arrows rove without saving, Enter chooses, Escape returns focus to the trigger", () => {
+    render(<PersonaSelector assignmentId="A1" />)
+    const trigger = screen.getByRole("button", { name: /Teaching style/ })
+    fireEvent.click(trigger)
+    const radios = screen.getAllByRole("radio")
+    expect(document.activeElement).toBe(radios[0])
+    expect(radios.map((r) => r.getAttribute("tabindex"))).toEqual(["0", "-1", "-1", "-1", "-1"])
+    fireEvent.keyDown(radios[0], { key: "ArrowDown" })
+    expect(document.activeElement).toBe(radios[1])
+    fireEvent.keyDown(radios[1], { key: "End" })
+    expect(document.activeElement).toBe(radios[4])
+    fireEvent.keyDown(radios[4], { key: "ArrowRight" })                 // wraps
+    expect(document.activeElement).toBe(radios[0])
+    fireEvent.keyDown(radios[0], { key: "ArrowUp" })                    // wraps back
+    expect(document.activeElement).toBe(radios[4])
+    expect(h.mutate).not.toHaveBeenCalled()
+    fireEvent.keyDown(document, { key: "Escape" })
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it("a failed styles fetch offers a retry instead of a blocking error", () => {
+    h.data = undefined
+    h.isError = true
+    render(<PersonaSelector />)
+    fireEvent.click(screen.getByRole("button", { name: /Teaching styles unavailable/ }))
+    expect(h.refetch).toHaveBeenCalledTimes(1)
   })
 
   it("choosing another style saves it for this assignment and closes; choosing the current one does nothing", () => {

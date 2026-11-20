@@ -37,3 +37,7 @@ When made inside an assignment with an open attempt, the change is a `AI_INTERAC
 ## Adding a persona
 Add one `TeachingPersona` entry to `_PERSONAS` (and its Arabic strings). No graph, prompt or migration change is needed. Tests in
 `ai/tests/test_personas_and_adaptation.py` enforce completeness, distinctness, Arabic text and the "ranks below the rules" directive.
+
+## Frontend presentation (English-only UI)
+
+The API's public persona view still carries `en` and `ar` strings, but the application UI is English-only, so `PersonaSelector` renders only the `en` fields (name, tagline, description) plus `tone` and `socratic` from the same payload. Arabic is reserved for learning content (student messages, Coach replies, board text), which is rendered with `dir="auto"`. Persona ids, versions and the stored preference format are unchanged. `frontend/src/lib/personas.contract.test.ts` checks that the ids and English names the UI is tested against match `ai/brain/personas.py`.

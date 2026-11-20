@@ -130,7 +130,7 @@ export default function NewAssignment() {
 
             {mode === "manual" ? (
               <Field id="assignment-prompt" label="Prompt">
-                <textarea
+                <textarea dir="auto"
                   id="assignment-prompt"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}

@@ -3,7 +3,8 @@ import { looksLikeCode } from "@/lib/richText"
 
 /**
  * Minimal, safe renderer for chat text: ```fenced``` blocks and `inline code`. Everything else stays plain text with
- * line breaks preserved. It builds React elements only (never HTML), so model output cannot inject markup.
+ * line breaks preserved. Each paragraph uses dir="auto" so Arabic (RTL) and English (LTR) learning content each get the correct base direction while the
+ * application shell stays LTR; code blocks are always LTR. It builds React elements only (never HTML), so model output cannot inject markup.
  */
 function inline(text: string): ReactNode[] {
   return text.split(/(`[^`\n]+`)/g).map((part, i) =>
@@ -17,7 +18,7 @@ function inline(text: string): ReactNode[] {
 
 function CodeBlock({ code }: { code: string }) {
   return (
-    <pre className="my-2 max-w-full overflow-x-auto rounded-[var(--radius-md)] bg-black/[0.06] p-3 font-mono text-[13px] leading-relaxed" tabIndex={0}>
+    <pre dir="ltr" className="my-2 max-w-full overflow-x-auto rounded-[var(--radius-md)] bg-black/[0.06] p-3 font-mono text-[13px] leading-relaxed" tabIndex={0}>
       <code>{code}</code>
     </pre>
   )
@@ -34,7 +35,7 @@ export function RichText({ text, detectCode = false }: { text: string; detectCod
         i % 2 === 1 ? (
           <CodeBlock key={i} code={seg.replace(/\n$/, "")} />
         ) : seg ? (
-          <p key={i} className="whitespace-pre-wrap [overflow-wrap:anywhere]">{inline(seg)}</p>
+          <p key={i} dir="auto" className="whitespace-pre-wrap [overflow-wrap:anywhere]">{inline(seg)}</p>
         ) : null
       )}
     </>

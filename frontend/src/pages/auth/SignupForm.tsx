@@ -11,13 +11,14 @@ import { homeFor, useAuth } from "@/lib/auth"
 import { fetchUniversities } from "@/lib/queries"
 import type { Role } from "@/types"
 
-type Values = { firstName: string; lastName: string; email: string; universityId: string; password: string; confirm: string }
+type Values = { firstName: string; lastName: string; email: string; universityId: string; password: string; confirm: string; signupCode: string }
 type Errors = Partial<Record<keyof Values, string>>
 
-const ORDER: (keyof Values)[] = ["firstName", "lastName", "email", "universityId", "password", "confirm"]
+const ORDER: (keyof Values)[] = ["firstName", "lastName", "email", "universityId", "signupCode", "password", "confirm"]
 
-function validate(v: Values): Errors {
+function validate(v: Values, needsCode: boolean): Errors {
   const e: Errors = {}
+  if (needsCode && !v.signupCode.trim()) e.signupCode = "Enter the instructor access code from your institution."
   if (!v.firstName.trim()) e.firstName = "Enter your first name."
   if (!v.lastName.trim()) e.lastName = "Enter your last name."
   if (!v.email.trim()) e.email = "Enter your email address."
@@ -39,10 +40,12 @@ export function SignupForm({ role }: { role: Role }) {
   const [errors, setErrors] = useState<Errors>({})
   const [confirmEmail, setConfirmEmail] = useState(false)
   const [universities, setUniversities] = useState<{ id: string; name: string }[]>([])
-  const [values, setValues] = useState<Values>({ firstName: "", lastName: "", email: "", universityId: "", password: "", confirm: "" })
+  const [codeRequired, setCodeRequired] = useState(false)
+  const [values, setValues] = useState<Values>({ firstName: "", lastName: "", email: "", universityId: "", password: "", confirm: "", signupCode: "" })
+  const needsCode = role === "teacher" && codeRequired
 
   useEffect(() => {
-    fetchUniversities().then((r) => setUniversities(r.universities)).catch(() => setFormError("We couldn't load the list of universities. Refresh to try again."))
+    fetchUniversities().then((r) => { setUniversities(r.universities); setCodeRequired(Boolean(r.teacher_code_required)) }).catch(() => setFormError("We couldn't load the list of universities. Refresh to try again."))
   }, [])
 
   useEffect(() => {
@@ -59,7 +62,7 @@ export function SignupForm({ role }: { role: Role }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
-    const found = validate(values)
+    const found = validate(values, needsCode)
     setErrors(found)
     const firstBad = ORDER.find((k) => found[k])
     if (firstBad) {
@@ -74,6 +77,7 @@ export function SignupForm({ role }: { role: Role }) {
         lastName: values.lastName.trim(),
         role: role === "teacher" ? "PROFESSOR" : "STUDENT",
         universityId: values.universityId,
+        ...(needsCode ? { signupCode: values.signupCode.trim() } : {}),
       })
       if (outcome === "confirm_email") setConfirmEmail(true)
     } catch (err) {
@@ -128,6 +132,12 @@ export function SignupForm({ role }: { role: Role }) {
               ))}
             </Select>
           </Field>
+
+          {needsCode && (
+            <Field id={id("signupCode")} label="Instructor access code" error={errors.signupCode} hint="Your institution gives this to instructors.">
+              <Input {...fieldProps(id("signupCode"), errors.signupCode)} autoComplete="off" value={values.signupCode} onChange={update("signupCode")} />
+            </Field>
+          )}
 
           <Field id={id("password")} label="Password" error={errors.password} hint="At least 8 characters.">
             <PasswordInput {...fieldProps(id("password"), errors.password, true)} autoComplete="new-password" value={values.password} onChange={update("password")} />

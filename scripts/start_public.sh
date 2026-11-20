@@ -28,6 +28,9 @@ fi
 # 1. Start Backend
 echo "1. Starting Backend API (Port 8000)..."
 cd "$ROOT_DIR"
+# The tunnel's https://<random>.trycloudflare.com origin is accepted only through this regex (it is no longer hard-coded in main.py).
+# An explicit value from the environment wins.
+export CORS_ORIGIN_REGEX="${CORS_ORIGIN_REGEX:-^https://[a-z0-9-]+\.trycloudflare\.com$}"
 nohup "$ROOT_DIR/.venv/bin/uvicorn" backend.app.main:app --host 127.0.0.1 --port 8000 > "$SCRIPT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$SCRIPT_DIR/backend.pid"

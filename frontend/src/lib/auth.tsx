@@ -20,6 +20,8 @@ export interface PendingProfile {
   lastName: string
   role: "STUDENT" | "PROFESSOR"
   universityId: string
+  /** Instructor access code, only when the deployment requires one. Kept with the pending profile until the profile is created. */
+  signupCode?: string
 }
 
 type Status = "loading" | "signed_out" | "needs_profile" | "ready" | "error"
@@ -72,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return
           } catch (err) {
             setError(err instanceof ApiError ? err.message : "We couldn't finish setting up your account.")
+            // A rejected instructor code must not be retried on every load; the Complete Profile form asks for it again.
+            if (err instanceof ApiError && err.code === "invalid_signup_code") localStorage.removeItem(PENDING_KEY)
           }
         }
         setMe(null)
@@ -133,7 +137,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 async function createProfile(p: PendingProfile) {
   await api("/auth/profile", {
     method: "POST",
-    body: { first_name: p.firstName, last_name: p.lastName, role: p.role, university_id: p.universityId },
+    body: {
+      first_name: p.firstName, last_name: p.lastName, role: p.role, university_id: p.universityId,
+      ...(p.role === "PROFESSOR" && p.signupCode ? { signup_code: p.signupCode } : {}),
+    },
   })
 }
 

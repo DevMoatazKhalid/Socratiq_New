@@ -94,6 +94,9 @@ class CoachState(TypedDict, total=False):
     # --- conversation ---
     messages: Annotated[list[BaseMessage], add_messages]
     current_attempt: str
+    # What the student said this turn (falls back to the attempt). This, not the whole attempt, is appended to `messages`.
+    turn_message: Optional[str]
+    generation_failed: bool     # the response generator raised; its canned reply is not sent to the LLM validator
     # Deterministic classification for low-cost trusted-context requests.
     request_intent: Optional[str]
 

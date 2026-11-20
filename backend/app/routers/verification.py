@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from psycopg import errors as pgerr
 
 from ..access import student_assignment
+from ai.verification.safety import outcome_for_score
 from ..auth import CurrentUser, get_db, require_student
 from ..db import Database, many, new_id, one
 from ..errors import conflict, not_found
@@ -109,7 +110,9 @@ def _overall(results: list[dict]) -> tuple[str, float, float]:
         return "INSUFFICIENT_EVIDENCE", 0.0, 0.0
     score = sum(float(r["score"]) for r in scored) / len(scored)
     conf = sum(float(r["confidence"]) for r in scored) / len(scored)
-    return ("PASS" if score >= 0.75 else "PARTIAL" if score >= 0.4 else "NEEDS_RETRY"), round(score, 4), round(conf, 4)
+    # Same thresholds as each question's evaluation (ai.verification.safety), so a run of PARTIAL answers cannot average into an overall PASS.
+    overall = outcome_for_score(score)
+    return (overall if overall != "INSUFFICIENT_EVIDENCE" else "NEEDS_RETRY"), round(score, 4), round(conf, 4)
 
 
 @router.post("/student/verification/{verification_id}/response", dependencies=[Depends(ai_rate_limit)])

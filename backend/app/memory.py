@@ -510,8 +510,11 @@ def get_complete_student_memory(
 
 # ── 3. Prompt Renderers for Socratic Coach & Live Voice ────────────────────────
 
-def format_memory_for_socratic_coach(profile: StudentMemoryProfile) -> str:
-    """Formats the unified student memory into pedagogical context for the LangGraph Socratic Coach."""
+def format_memory_for_socratic_coach(profile: StudentMemoryProfile, *, include_board: bool = True, include_libraries: bool = True) -> str:
+    """Formats the unified student memory into pedagogical context for the LangGraph Socratic Coach.
+
+    The Chat Coach already receives the stored board and the course-material catalogue in its own prompt blocks, so it asks for this
+    block WITHOUT them (`include_board=False, include_libraries=False`): the learner model only, no paying twice for the same content."""
     blocks: list[str] = ["=== STUDENT LEARNING MEMORY & ACADEMIC CONTINUITY ==="]
 
     # Strengths
@@ -535,7 +538,7 @@ def format_memory_for_socratic_coach(profile: StudentMemoryProfile) -> str:
 
     # Whiteboard Memory & Attribution
     wb = profile.whiteboard_memory
-    if wb.get("has_board"):
+    if include_board and wb.get("has_board"):
         wb_lines = []
         if wb.get("student_equations"):
             wb_lines.append("  Student Equations on Board: " + " | ".join(wb["student_equations"][:4]))
@@ -549,7 +552,7 @@ def format_memory_for_socratic_coach(profile: StudentMemoryProfile) -> str:
             blocks.append("Whiteboard Context & Content Attribution:\n" + "\n".join(wb_lines))
 
     # Educational Library memory
-    if profile.educational_libraries:
+    if include_libraries and profile.educational_libraries:
         lib_lines = [
             f"  - {doc['title']} [{doc['kind']}] ({doc['ownership']}, {doc['indexing_status']})"
             for doc in profile.educational_libraries[:8]

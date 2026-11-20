@@ -50,6 +50,8 @@ import { LiveVoicePanel } from "./LiveVoicePanel"
 import { BoardSimulationLayer } from "./BoardSimulationLayer"
 import { isSimulationCard, type SimulationMap, type SimulationRecord } from "@/lib/smartboard/simulationRef"
 import { sameViewport, type BoardViewport } from "@/lib/smartboard/simulationLayout"
+import { contentBounds, decideResizeView, makeMemo, usable, type FitMemo, type ViewState } from "@/lib/smartboard/resizeFit"
+import { MIN_SCALE } from "@/lib/boardViewport"
 import { validateSimulationCode } from "@/lib/smartboard/simulationDoc"
 
 /** Same contract as the legacy BoardWorkspace, so the Coach page can use either engine. */
@@ -268,6 +270,48 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
       window.removeEventListener("keydown", handleKeyDown)
     }
   }, [isCssFullscreen])
+
+  // Keep every board element reachable when the board's container changes size (window resize, split divider, panel collapse/expand, fullscreen).
+  // Excalidraw re-measures its canvas but keeps scroll/zoom, so a narrower board silently pushes content out of view. We watch the container itself,
+  // wait until the size settles, then ask lib/smartboard/resizeFit what to do: re-fit on shrink (never below the board's minimum zoom; the student can
+  // still pan), restore the earlier view on grow, and leave a deliberate zoomed-in view alone. Only the viewport changes, never the elements.
+  const fitMemo = useRef<FitMemo | null>(null)
+  const lastSize = useRef<{ width: number; height: number } | null>(null)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || !ready || typeof ResizeObserver === "undefined") return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let raf = 0
+    let retried = false
+    const evaluate = () => {
+      const api = apiRef.current
+      if (!api) return
+      const st = api.getAppState()
+      const next: ViewState = { scrollX: st.scrollX, scrollY: st.scrollY, zoom: st.zoom.value, width: st.width, height: st.height }
+      if (!usable(next)) return                                         // hidden panel: keep the last good size and wait to be shown again
+      // Excalidraw measures its canvas on its own observer: if it has not caught up with the container yet, nudge it and look once more.
+      if ((Math.abs(st.width - el.clientWidth) > 2 || Math.abs(st.height - el.clientHeight) > 2) && !retried) { retried = true; api.refresh(); raf = requestAnimationFrame(evaluate); return }
+      retried = false
+      const prev: ViewState = lastSize.current ? { ...next, ...lastSize.current } : next
+      lastSize.current = { width: next.width, height: next.height }
+      const d = decideResizeView(contentBounds(api.getSceneElements()), prev, next, fitMemo.current)
+      if (d.kind === "none") { fitMemo.current = d.memo; return }
+      if (d.kind === "restore") {
+        fitMemo.current = null
+        api.updateScene({ appState: { scrollX: d.view.scrollX, scrollY: d.view.scrollY, zoom: { value: d.view.zoom } } as never, captureUpdate: CaptureUpdateAction.NEVER })
+        return
+      }
+      api.scrollToContent(undefined, { fitToContent: true, animate: false, maxZoom: 1, minZoom: MIN_SCALE })
+      const before = d.before
+      raf = requestAnimationFrame(() => {                                // the new view lands after React flushes: record it so a later grow can undo it
+        const a = apiRef.current?.getAppState()
+        if (a) fitMemo.current = makeMemo(before, { scrollX: a.scrollX, scrollY: a.scrollY, zoom: a.zoom.value })
+      })
+    }
+    const ro = new ResizeObserver(() => { clearTimeout(timer); timer = setTimeout(() => { retried = false; evaluate() }, 100) })
+    ro.observe(el)
+    return () => { ro.disconnect(); clearTimeout(timer); cancelAnimationFrame(raf) }
+  }, [ready])
 
   const toggleFullscreen = useCallback(async () => {
     try {
@@ -523,7 +567,9 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
       {!readOnly && <SaveBadge s={save} onRetry={() => void saver.flush()} />}
     </>
   )
-  const lang = typeof document !== "undefined" && document.documentElement.lang.startsWith("ar") ? "ar-SA" : "en"
+  // The application UI is English-only. Excalidraw's `langCode` localises only its own chrome (menus, tool tooltips), never the canvas content,
+  // so Arabic text on the board still renders and shapes correctly (see TextNode / dir="auto").
+  const lang = "en"
 
   const activeFullscreen = isFullscreen || isCssFullscreen
 
@@ -586,11 +632,11 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
               type="button"
               onClick={() => void toggleFullscreen()}
               className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white/90 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-sm"
-              title={activeFullscreen ? (lang === "ar-SA" ? "إنهاء ملء الشاشة" : "Exit full screen") : (lang === "ar-SA" ? "ملء الشاشة" : "Full screen")}
+              title={activeFullscreen ? "Exit full screen" : "Full screen"}
               aria-label={activeFullscreen ? "Exit full screen" : "Full screen"}
             >
               {activeFullscreen ? <Minimize className="size-3.5 text-teal-600" /> : <Maximize className="size-3.5 text-teal-600" />}
-              <span>{activeFullscreen ? (lang === "ar-SA" ? "تصغير" : "Exit") : (lang === "ar-SA" ? "ملء الشاشة" : "Full screen")}</span>
+              <span>{activeFullscreen ? "Exit" : "Full screen"}</span>
             </button>
           </div>
         )}
@@ -642,7 +688,7 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-teal-600" />
           </span>
-          <span>{lang === "ar-SA" ? "سقراطيك يكتب على اللوحة الآن…" : "SocratiQ is writing on the board…"}</span>
+          <span>SocratiQ is writing on the board…</span>
         </div>
       )}
 

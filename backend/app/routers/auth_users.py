@@ -1,5 +1,8 @@
+import hmac
+
 from fastapi import APIRouter, Depends, HTTPException
 
+from ..config import get_backend_config
 from ..auth import CurrentUser, Identity, get_current_user, get_db, get_identity
 from ..db import Database, many, new_id, one
 from ..errors import AppError, conflict
@@ -36,12 +39,25 @@ def _me(u: CurrentUser) -> dict:
 def universities(db: Database = Depends(get_db)):
     """For the signup form, which runs BEFORE a session exists. Public by necessity; it exposes only ids and names."""
     with db.tx() as c:
-        return {"universities": [{"id": r["university_id"], "name": r["name"]} for r in many(c, "SELECT university_id, name FROM universities ORDER BY name")]}
+        rows = many(c, "SELECT university_id, name FROM universities ORDER BY name")
+    # Says only WHETHER an instructor code is required, never the code.
+    return {"universities": [{"id": r["university_id"], "name": r["name"]} for r in rows],
+            "teacher_code_required": bool(get_backend_config().teacher_signup_code)}
 
 
 @router.get("/me")
 def me(user: CurrentUser = Depends(get_current_user)):
     return _me(user)
+
+
+def _check_teacher_code(body: ProfileIn) -> None:
+    """Self-service signup could previously mint an instructor account for anyone. With TEACHER_SIGNUP_CODE set, PROFESSOR requires it."""
+    expected = get_backend_config().teacher_signup_code
+    if body.role != "PROFESSOR" or not expected:
+        return
+    given = (body.signup_code or "").strip()
+    if not given or not hmac.compare_digest(given.encode("utf-8"), expected.encode("utf-8")):
+        raise AppError(403, "That instructor access code isn't valid. Ask your institution for the current code.", "invalid_signup_code")
 
 
 @router.post("/auth/profile", status_code=201)
@@ -55,6 +71,7 @@ def create_profile(body: ProfileIn, identity: Identity = Depends(get_identity), 
     with db.tx() as c:
         if one(c, "SELECT 1 AS x FROM users WHERE auth_user_id = %s", (identity.auth_user_id,)):
             raise conflict("A profile already exists for this account.", "profile_exists")
+        _check_teacher_code(body)
         if not one(c, "SELECT 1 AS x FROM universities WHERE university_id = %s", (body.university_id,)):
             raise AppError(422, "Unknown university.")
         user_id = new_id("usr")

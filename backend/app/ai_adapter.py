@@ -199,6 +199,9 @@ class AIAdapter:
             materials=assignment.get("materials") or [],
             materials_total=int(assignment.get("materials_total") or 0),
             concepts=list(assignment.get("concepts") or []),
+            # The learner model (strengths, gaps, misconceptions, recurring obstacles) computed by the backend for this turn. It was
+            # computed on every turn before but never handed over, so the Coach never saw the student's history.
+            student_memory_text=assignment.get("student_memory_text") or None,
         )
         convo = [HumanMessage(content=m["content"]) if m["sender"] == "STUDENT" else AIMessage(content=m["content"]) for m in history]
         prior_dx = prior_iv = None

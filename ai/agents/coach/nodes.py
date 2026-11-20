@@ -122,6 +122,14 @@ def _format_student_learning_context(chunks: list[RetrievedContext]) -> str:
     return "\n".join(lines)
 
 
+MAX_QUERY_INSTRUCTIONS_CHARS = 600
+
+
+def _clip_words(text: str, n: int) -> str:
+    t = " ".join(str(text or "").split())
+    return t if len(t) <= n else t[:n].rsplit(" ", 1)[0]
+
+
 def build_retrieval_query(state: CoachState) -> str:
     """Focused deterministic query from trusted task context + current evidence."""
     task = state.get("task_context")
@@ -136,7 +144,8 @@ def build_retrieval_query(state: CoachState) -> str:
         # junction tables to understand what the student needs to study.
         parts.append(f"Assignment: {task.title}")
         if task.instructions:
-            parts.append(f"Instructions: {task.instructions}")
+            # Bounded: the query is embedded as ONE vector, and a multi-page brief drowns the concept the student is stuck on.
+            parts.append(f"Instructions: {_clip_words(task.instructions, MAX_QUERY_INSTRUCTIONS_CHARS)}")
         if task.subject_area:
             parts.append(f"Subject area: {task.subject_area}")
     if diagnosis:
@@ -144,11 +153,11 @@ def build_retrieval_query(state: CoachState) -> str:
             norm_c = normalize_concept(diagnosis.concept)
             parts.append(f"Concept: {norm_c or diagnosis.concept}")
         if diagnosis.explanation:
-            parts.append(f"Learning issue: {diagnosis.explanation}")
+            parts.append(f"Learning issue: {_clip_words(diagnosis.explanation, 300)}")
         if diagnosis.evidence:
-            parts.append(f"Attempt evidence: {diagnosis.evidence}")
+            parts.append(f"Attempt evidence: {_clip_words(diagnosis.evidence, 300)}")
     if recent_student:
-        parts.append(f"Student question/attempt: {recent_student}")
+        parts.append(f"Student question/attempt: {_clip_words(recent_student, 600)}")
     elif state.get("current_attempt"):
         parts.append(f"Student question/attempt: {state['current_attempt'][:200]}")
 
@@ -219,7 +228,7 @@ def understand_context(state: CoachState) -> dict:
     errors = list(state.get("errors") or [])
     metadata = state["metadata"]
     metadata.turn_index = (metadata.turn_index or 0) + 1
-    attempt_message = HumanMessage(content=state["current_attempt"])
+    attempt_message = HumanMessage(content=state.get("turn_message") or state["current_attempt"])
 
     return {
         "messages": [attempt_message],
@@ -674,6 +683,7 @@ def generate_response(state: CoachState) -> dict:
             "referenced_concepts": result.referenced_concepts,
             "board_actions": [],
             "visual_plan": None,
+            "generation_failed": False,
         }
         update["visual_plan"] = _accepted_visual_plan(state, getattr(result, "visual_plan", None))
         if state.get("board_enabled"):
@@ -714,7 +724,9 @@ def generate_response(state: CoachState) -> dict:
             "I ran into an issue putting together a response. Could you try rephrasing your "
             "question, or ask again in a moment?"
         )
-        return {"response": fallback, "referenced_concepts": [], "errors": errors}
+        # A canned, policy-safe sentence: there is nothing for the LLM validator to judge, so routing skips it (see routing).
+        return {"response": fallback, "referenced_concepts": [], "errors": errors, "generation_failed": True,
+                "board_actions": [], "visual_plan": None}
 
 
 # ---------------------------------------------------------------------------
@@ -747,6 +759,10 @@ def validate(state: CoachState) -> dict:
         course_material=course_material,
         draft_response=draft,
         is_programming=is_programming,
+        # The reviewer judges "does this reveal the answer / stay on topic / stay grounded" AGAINST these; before, it saw none of them.
+        assignment_title=state["task_context"].title,
+        assignment_instructions=state["task_context"].instructions,
+        student_work=state.get("current_attempt") or "",
     )
 
     update: dict = {"validation_passed": result.passes, "validation_violations": list(result.violations)}

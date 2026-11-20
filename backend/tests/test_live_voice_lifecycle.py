@@ -139,8 +139,8 @@ def test_real_relay_round_trip_uses_server_owned_setup_and_cleans_up(provider, c
     assert "single pedagogical authority" in blob
     assert any(d.get("name") for t in setup["tools"] for d in t["functionDeclarations"])
     assert provider.urls and "key=" in provider.urls[0]
-    assert _wait(lambda: provider.closed == 1)                                          # the provider connection was closed
-    assert _wait(lambda: not sb._active_live_users)                                     # the user's slot was released
+    assert _wait(lambda: (client.get("/health"), provider.closed == 1)[1], secs=5.0)   # the provider connection was closed
+    assert _wait(lambda: (client.get("/health"), not sb._active_live_users)[1], secs=5.0) # the user's slot was released
 
 
 def test_the_provider_key_is_never_logged(provider, client, caplog):

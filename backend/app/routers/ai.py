@@ -28,8 +28,10 @@ from ..memory import get_complete_student_memory, format_memory_for_socratic_coa
 from ai.brain.personas import persona_ref
 from ..personas import load_persona
 from ..streaming import LATENCY, StageTimer, segment_text
+from ai.rag.security import sanitize_untrusted_text
 
-BOARD_MAX_BYTES = 380_000            # below the database CHECK (400 000): a turn must never fail on board size
+BOARD_MAX_BYTES = 380_000
+MAX_MEMORY_CHARS = 2_000            # learner-model block in the Coach prompt            # below the database CHECK (400 000): a turn must never fail on board size
 log = logging.getLogger("socratiq.ai.stream")
 router = APIRouter(tags=["ai"])
 OPEN = ("DRAFT", "IN_PROGRESS")
@@ -87,7 +89,10 @@ def _read_turn(db: Database, user: CurrentUser, body: CoachIn) -> dict:
                 assignment_id=a["assignment_id"],
                 course_id=a.get("course_id"),
             )
-            a["student_memory_text"] = format_memory_for_socratic_coach(mem)
+            # The learner model only (the board and the material catalogue already have their own prompt blocks). Observations in it were
+            # derived from student work, so it is sanitised and bounded like any other untrusted text before it reaches the Coach.
+            mem_text = format_memory_for_socratic_coach(mem, include_board=False, include_libraries=False)
+            a["student_memory_text"] = sanitize_untrusted_text(mem_text)[:MAX_MEMORY_CHARS] if mem_text.count("\n") > 2 else None
         except Exception as exc:
             log.warning("Could not query complete student memory for coach: %s", exc)
 

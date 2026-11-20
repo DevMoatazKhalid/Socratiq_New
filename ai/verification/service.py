@@ -27,6 +27,7 @@ from ai.verification.models import (
     VerificationResult,
     VerificationType,
 )
+from ai.verification.safety import reconcile_evaluation
 from ai.verification.strategies import (
     BaseVerificationStrategy,
     ExplainStrategy,
@@ -105,6 +106,15 @@ class VerificationService:
         try:
             llm = get_structured_llm(ModelRole.VERIFICATION, VerificationEvaluationPayload)
             evaluation: VerificationEvaluationPayload = llm.invoke(prompt_messages)
+
+            # Make the result agree with the rubric the model filled in and refuse to be steered by the answer itself (only ever lowers).
+            outcome, score, confidence, notes = reconcile_evaluation(
+                outcome=evaluation.outcome.value, score=evaluation.score, confidence=evaluation.confidence,
+                criteria_passed=[c.passed for c in evaluation.criteria_evaluations], student_response=request.student_response,
+            )
+            if notes:
+                logger.warning("verification result adjusted (%s): %s", request.verification_type.value, " | ".join(notes))
+            evaluation = evaluation.model_copy(update={"outcome": VerificationOutcome(outcome), "score": score, "confidence": confidence})
 
             # Build result
             result = VerificationResult(

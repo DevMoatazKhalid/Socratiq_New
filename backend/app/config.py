@@ -8,6 +8,8 @@ No secrets live in code. Historical variable names are accepted as aliases so ex
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import secrets
 from pathlib import Path
@@ -62,6 +64,8 @@ class BackendConfig:
         self.storage_backend: str = (_clean("STORAGE_BACKEND") or default_backend).lower()
         self.local_storage_dir: Path = Path(_clean("LOCAL_STORAGE_DIR") or (_PROJECT_ROOT / "data" / "uploads"))
         self.file_link_secret: Optional[str] = _clean("FILE_LINK_SECRET")
+        # HMAC key for SmartBoard provenance (signed Coach element ids, single-use visual grants). Optional: see board_signing_key().
+        self.board_signing_secret: Optional[str] = _clean("BOARD_SIGNING_SECRET")
         self.file_link_ttl_seconds: int = _int("FILE_LINK_TTL_SECONDS", 300, 30)
         self.max_upload_mb: int = _int("MAX_UPLOAD_MB", 50, 1)      # global ceiling; per-format limits are lower
         self.public_api_url: str = (_clean("PUBLIC_API_URL") or "http://localhost:8000").rstrip("/")
@@ -76,6 +80,14 @@ class BackendConfig:
         # --- HTTP
         raw = _clean("CORS_ORIGINS", "CORS_ALLOWED_ORIGINS") or "http://localhost:5173"
         self.cors_origins: List[str] = [o.strip() for o in raw.split(",") if o.strip()]
+        # Extra origins as ONE regular expression (for example temporary tunnels: ^https://[a-z0-9-]+\.trycloudflare\.com$).
+        # Unset = none. It used to be hard-coded to every trycloudflare.com subdomain in every environment.
+        self.cors_origin_regex: Optional[str] = _clean("CORS_ORIGIN_REGEX")
+        # Unauthenticated Live Voice on the public /smartboard-demo page. Off unless explicitly enabled, and never in production.
+        # When set, an instructor account can only be created with this code (given out by the institution). Unset = previous behaviour
+        # (anyone can choose "instructor" at signup), so existing deployments keep working until an operator opts in.
+        self.teacher_signup_code: Optional[str] = _clean("TEACHER_SIGNUP_CODE")
+        self.public_demo_voice: bool = (_clean("SMARTBOARD_PUBLIC_DEMO_VOICE") or "false").lower() in ("1", "true", "yes")
 
         # --- Product rules
         self.ai_rate_limit_per_minute: int = _int("AI_RATE_LIMIT_PER_MINUTE", 10, 1)
@@ -96,6 +108,22 @@ class BackendConfig:
         if not hasattr(self, "_dev_secret"):
             self._dev_secret = secrets.token_urlsafe(32)
         return self._dev_secret
+
+    def board_signing_key(self) -> bytes:
+        """HMAC key for SmartBoard provenance. Order: BOARD_SIGNING_SECRET, FILE_LINK_SECRET, then a key DERIVED from the
+        Supabase service-role key (server-only, required in production, stable across restarts, so no extra setting is needed).
+        Development without any of them gets a random per-process key. Never a constant: a constant ships with the source code."""
+        if self.board_signing_secret:
+            return self.board_signing_secret.encode("utf-8")
+        if self.file_link_secret:
+            return self.file_link_secret.encode("utf-8")
+        if self.supabase_service_role_key:
+            return hmac.new(self.supabase_service_role_key.encode("utf-8"), b"socratiq/board-signing/v1", hashlib.sha256).digest()
+        if self.is_production:
+            raise RuntimeError("BOARD_SIGNING_SECRET (or SUPABASE_SERVICE_ROLE_KEY) is required in production")
+        if not hasattr(self, "_dev_board_key"):
+            self._dev_board_key = secrets.token_bytes(32)
+        return self._dev_board_key
 
     def require_supabase(self) -> Tuple[str, str]:
         missing = [n for n, v in (("SUPABASE_URL", self.supabase_url),
@@ -120,6 +148,8 @@ class BackendConfig:
                 problems.append("CORS_ORIGINS must list explicit origins in production (no '*')")
             if self.storage_backend == "local":
                 problems.append("STORAGE_BACKEND=local is not allowed in production; use Supabase Storage")
+            if self.public_demo_voice:
+                problems.append("SMARTBOARD_PUBLIC_DEMO_VOICE must be off in production (it opens unauthenticated Gemini Live sessions)")
         return problems
 
 

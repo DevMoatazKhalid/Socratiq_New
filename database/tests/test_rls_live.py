@@ -15,13 +15,21 @@ import psycopg
 import pytest
 
 load_dotenv()
-DB_URL = os.getenv("DATABASE_URL")
+DB_URL = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
+if DB_URL and ("supabase.co" in DB_URL or "pooler.supabase" in DB_URL):
+    local_admin = os.getenv("TEST_ADMIN_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
+    if "supabase.co" not in local_admin and "pooler.supabase" not in local_admin:
+        from urllib.parse import urlparse, urlunparse
+        p = urlparse(local_admin)
+        DB_URL = urlunparse(p._replace(path="/socratiq_test_template"))
+    else:
+        DB_URL = None
 
 
 @pytest.fixture(scope="module")
 def conn():
     if not DB_URL:
-        pytest.skip("DATABASE_URL not set")
+        pytest.skip("DATABASE_URL not set or points to production/Supabase")
     try:
         with psycopg.connect(DB_URL, autocommit=True) as c:
             yield c
@@ -115,7 +123,18 @@ def test_student_preferences_cross_student_isolation(conn):
         """)
         students = cur.fetchall()
         if len(students) < 2:
-            pytest.skip("Need at least 2 students in database for cross-student test")
+            import sys
+            from pathlib import Path
+            sys.path.insert(0, str(Path(__file__).parent))
+            import dbtools
+            dbtools.seed(conn)
+            cur.execute("""
+                SELECT u.user_id, u.auth_user_id::text, u.university_id
+                FROM users u
+                WHERE u.role = 'STUDENT'
+                LIMIT 2;
+            """)
+            students = cur.fetchall()
 
         s1_id, s1_auth, s1_univ = students[0]
         s2_id, s2_auth, s2_univ = students[1]

@@ -30,3 +30,7 @@ scripts/*.pid
 # archives & releases
 *.zip
 *.tar.gz
+
+# RAG document storage (RAG_STORAGE_DIR default). Holds uploaded/ingested course files at runtime and the
+# smoke test writes a new doc_<hash>_gradient_descent.pdf here on every run: never source.
+data/documents/

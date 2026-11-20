@@ -18,6 +18,7 @@ class ProfileIn(Strict):
     last_name: str = Field(min_length=1, max_length=80)
     role: Literal["STUDENT", "PROFESSOR"]
     university_id: str = Field(min_length=1, max_length=80)
+    signup_code: Optional[str] = Field(default=None, max_length=128)   # instructor access code; see config.teacher_signup_code
 
 
 COLORS = ("plum", "slate", "teal", "clay")

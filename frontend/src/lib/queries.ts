@@ -32,7 +32,7 @@ export async function downloadFile(fileId: string) {
   window.open(link.url, "_blank", "noopener")
 }
 
-export interface Universities { universities: { id: string; name: string }[] }
+export interface Universities { universities: { id: string; name: string }[]; teacher_code_required?: boolean }
 export const fetchUniversities = () => api<Universities>("/universities", { auth: false })
 
 // ================================================================== student
@@ -131,7 +131,9 @@ export function sendCoachStream(v: CoachSend, onStage: (label: string) => void, 
   return apiStream<CoachReply>("/ai/coach/stream", body, (label) => onStage(label), signal, onDelta)
 }
 // ---- teaching personas (the choice is stored server-side and applies to Chat, Board and Live Voice alike)
-export interface PersonaInfo { id: string; version: number; name: { en: string; ar: string }; tagline: { en: string; ar: string }; description: { en: string; ar: string }; tone: string; formality: string }
+/** The server's public persona view is the single source of truth for names and descriptions. `ar` is delivered by the API but the application UI is
+ *  English-only, so it is intentionally never rendered. `socratic` ("high" | "medium") summarises how much the persona leads with questions. */
+export interface PersonaInfo { id: string; version: number; name: { en: string; ar?: string }; tagline: { en: string; ar?: string }; description: { en: string; ar?: string }; tone: string; formality: string; socratic?: string; visual?: string }
 export interface PersonaState { personas: PersonaInfo[]; selected: { id: string; version: number }; default: string }
 export function usePersonas() {
   return useQuery({ queryKey: ["student", "personas"], queryFn: () => api<PersonaState>("/student/teaching-personas"), staleTime: 5 * 60_000 })

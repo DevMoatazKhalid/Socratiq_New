@@ -46,7 +46,7 @@ export function GradePanel({ assignmentId, studentId, grade, hasSubmission }: { 
         </Field>
       </div>
       <Field id="grade-feedback" label="Feedback (optional)" hint="Shown to the student with the grade." className="mt-4">
-        <textarea id="grade-feedback" rows={4} maxLength={4000} value={feedback} disabled={!hasSubmission} onChange={(e) => { setFeedback(e.target.value); setSaved(false) }}
+        <textarea dir="auto" id="grade-feedback" rows={4} maxLength={4000} value={feedback} disabled={!hasSubmission} onChange={(e) => { setFeedback(e.target.value); setSaved(false) }}
           className="w-full rounded-[var(--radius-md)] border border-[var(--color-control-border)] bg-white p-3 text-sm text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-teal-dark)]" />
       </Field>
       {error && <p role="alert" className="mt-3 text-sm text-[var(--color-danger-ink)]">{error}</p>}
