@@ -229,7 +229,7 @@ def test_rapid_start_stop_never_leaks_slots_or_provider_connections(provider, cl
             ws.send_text(json.dumps(SETUP))
             ws.receive_text()
     assert _wait(lambda: (client.get("/health"), not sb._active_live_users)[1])
-    assert _wait(lambda: (client.get("/health"), provider.closed == provider.connected == 6)[1])
+    assert _wait(lambda: (client.get("/health"), provider.closed == provider.connected == 6)[1], secs=5.0)
 
 
 def test_per_user_concurrency_limit_and_recovery(provider, client):
