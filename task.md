@@ -1,4 +1,4 @@
-# SocratiQ V2 Completion — Task Tracker
+# SocratiQ V2 Completion — Task Tracker - this is not needed
 
 ## Phase 1: Environment Setup & Baseline
 - [x] Copy .env files from reference project
