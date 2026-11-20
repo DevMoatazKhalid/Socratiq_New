@@ -31,15 +31,45 @@ class FakeProvider:
     def __init__(self):
         self.mode = "echo"
         self.received: list[str] = []
-        self.connected = 0
-        self.closed = 0
+        self._lock = threading.Lock()   # guards connected/closed, accessed from both the provider thread and the test thread
+        self._connected = 0
+        self._closed = 0
         self.urls: list[str] = []
         self._ready = threading.Event()
+        self._close_event = threading.Event()   # set when _closed reaches _expected_closed
+        self._expected_closed = 0
         self._loop = None
         self.port = None
 
+    # ---- thread-safe properties ----
+    @property
+    def connected(self) -> int:
+        with self._lock:
+            return self._connected
+
+    @property
+    def closed(self) -> int:
+        with self._lock:
+            return self._closed
+
+    def wait_all_closed(self, expected: int, timeout: float = 15.0) -> bool:
+        """Block the calling (test) thread until ``closed >= expected``, or until *timeout* seconds elapse.
+
+        Returns True if the condition was met, False on timeout.
+        Unlike a fixed-sleep poll this is event-driven: it returns as soon as the
+        last handler exits, making it safe on arbitrarily slow CI runners without
+        inflating wall-clock test time.
+        """
+        with self._lock:
+            self._expected_closed = expected
+            already = self._closed >= expected
+        if already:
+            return True
+        return self._close_event.wait(timeout)
+
     async def _handler(self, ws):
-        self.connected += 1
+        with self._lock:
+            self._connected += 1
         self.urls.append(ws.request.path)
         try:
             first = await ws.recv()
@@ -58,7 +88,12 @@ class FakeProvider:
         except Exception:
             pass
         finally:
-            self.closed += 1
+            with self._lock:
+                self._closed += 1
+                closed_now = self._closed
+                expected = self._expected_closed
+            if expected > 0 and closed_now >= expected:
+                self._close_event.set()
 
     def start(self):
         def run():
@@ -229,7 +264,9 @@ def test_rapid_start_stop_never_leaks_slots_or_provider_connections(provider, cl
             ws.send_text(json.dumps(SETUP))
             ws.receive_text()
     assert _wait(lambda: (client.get("/health"), not sb._active_live_users)[1])
-    assert _wait(lambda: (client.get("/health"), provider.closed == provider.connected == 6)[1], secs=5.0)
+    # wait_all_closed() blocks until the FakeProvider's own thread confirms all 6 handlers exited.
+    # This is event-driven rather than a fixed-timeout poll, so it cannot flake on slow CI runners.
+    assert provider.wait_all_closed(6), f"provider.closed={provider.closed} connected={provider.connected} after 15s"
 
 
 def test_per_user_concurrency_limit_and_recovery(provider, client):

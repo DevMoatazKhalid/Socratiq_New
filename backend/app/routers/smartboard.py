@@ -1666,9 +1666,12 @@ async def live_relay(client_ws: WebSocket):
             _release_live_slot(user.user_id, client_ws)
         if g_ws is not None:
             try:
-                t = asyncio.get_running_loop().create_task(g_ws.close())    # detached: this task may be cancelled and cannot await reliably
-                _background_tasks.add(t)                                     # asyncio keeps only weak references: hold it until it finishes
-                t.add_done_callback(_background_tasks.discard)
+                # Close the underlying TCP transport synchronously.  A detached create_task(g_ws.close()) is unreliable
+                # here because the event loop may never give the task a chance to run if this coroutine is being cancelled
+                # (the task would be garbage-collected pending, leaving the provider with a dangling open connection).
+                # transport.close() needs no await, works under CancelledError, and causes the provider-side recv() to
+                # fail immediately so its cleanup always runs.
+                g_ws.transport.close()
             except Exception:
                 pass
         raise
