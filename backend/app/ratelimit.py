@@ -5,9 +5,9 @@ from __future__ import annotations
 import threading
 import time
 from collections import defaultdict, deque
-from typing import Callable, Optional
+from typing import Callable
 
-from fastapi import Depends, Request
+from fastapi import Depends
 
 from .auth import CurrentUser, get_current_user
 from .config import get_backend_config
@@ -30,37 +30,18 @@ def limiter(name: str, per_minute: Callable[[], int], message: str):
     return dep
 
 
-def ip_limiter(name: str, per_minute: Callable[[], int], message: str):
-    """Rate limiter that works for unauthenticated requests using client IP.
-    Falls back to user_id if an Authorization header is present and valid."""
-    def dep(request: Request) -> None:
-        # Try to extract user identity from Authorization header (best-effort)
-        key_id: Optional[str] = None
-        auth_header = request.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            # Use a hash of the token as key (don't resolve full user for perf)
-            import hashlib
-            key_id = "user:" + hashlib.sha256(auth_header[7:40].encode()).hexdigest()[:16]
-        if not key_id:
-            # Fall back to client IP
-            client = request.client
-            key_id = "ip:" + (client.host if client else "unknown")
-
-        limit, now = per_minute(), time.monotonic()
-        with _lock:
-            q = _hits[(name, key_id)]
-            while q and now - q[0] > 60:
-                q.popleft()
-            if len(q) >= limit:
-                raise AppError(429, message, code="rate_limited")
-            q.append(now)
-    return dep
-
-
 ai_rate_limit = limiter("ai", lambda: get_backend_config().ai_rate_limit_per_minute, "You're sending messages too fast. Please wait a moment.")
 upload_rate_limit = limiter("upload", lambda: get_backend_config().upload_rate_limit_per_minute, "Too many uploads. Please wait a moment.")
 join_rate_limit = limiter("join", lambda: 10, "Too many attempts. Please wait a minute before trying another code.")
-smartboard_rate_limit = ip_limiter("smartboard_gen", lambda: 20, "Too many generation requests. Please wait a moment.")
+# Per USER (these endpoints all require a signed-in user). This used to be keyed on a hash of the first 33 characters of the bearer token,
+# which is the JWT header -- identical for every user of the project -- so all students shared ONE bucket and one student could lock out the rest.
+smartboard_rate_limit = limiter("smartboard_gen", lambda: 20, "Too many generation requests. Please wait a moment.")
+board_chat_rate_limit = limiter("board_chat", lambda: get_backend_config().ai_rate_limit_per_minute, "You're sending messages too fast. Please wait a moment.")
+
+code_run_rate_limit = limiter("code_run", lambda: get_backend_config().code_run_rate_limit_per_minute,
+                              "You're running code very quickly. Please wait a moment and try again.")
+# Notes auto-save on a debounce (about one save per second of typing at most); this only stops runaway clients.
+notes_write_rate_limit = limiter("notes_write", lambda: 240, "Your notes are saving too often. Please wait a moment.")
 
 
 def reset_limits() -> None:   # tests

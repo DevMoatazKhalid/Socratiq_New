@@ -118,6 +118,9 @@ def route_after_response_generation(state: CoachState) -> str:
     They are generated solely from trusted assignment context and are not
     diagnostic coaching responses. All normal Coach responses remain validated.
     """
+    if state.get("generation_failed"):
+        # The generator failed and produced the canned "please rephrase" sentence: validating it would spend an LLM call on text we wrote.
+        return "emit_interaction"
     if state.get("request_intent") in {"assignment_about", "assignment_topics"}:
         # These responses are grounded by a deterministic application-context check in
         # generate_response. They do not need a second LLM validator.

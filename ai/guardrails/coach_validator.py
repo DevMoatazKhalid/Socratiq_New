@@ -56,18 +56,38 @@ _CODE_ANALYSIS_TOOL = CodeAnalysisTool()
 
 # ── Universal answer-revealing phrases (apply to ALL policies) ────────────
 # The Coach MUST NEVER give the student the final answer, regardless of policy.
+#
+# Two kinds of signal:
+#   * "Hand-over" phrases ("here is the solution") are unambiguous and matched as substrings.
+#   * "X is ..." statements ("the answer is 42") are matched by `_ANSWER_REVEAL_PATTERN` below, which
+#     deliberately does NOT fire on feedback about the STUDENT'S OWN work ("your answer is correct",
+#     "your solution is almost there", "the answer is not quite right yet"). Blocking those replaced
+#     every piece of praise with a generic "walk me through your reasoning", which told students who
+#     had just got it right to start over -- the opposite of good Socratic coaching.
 _UNIVERSAL_RED_FLAG_PHRASES = (
-    "the answer is",
-    "the correct answer is",
     "here is the solution",
     "here's the solution",
-    "the final answer is",
-    "the solution is",
     "here is the complete solution",
     "here's the complete solution",
     "here is the full solution",
     "here's the full solution",
-    "the correct solution is",
+    "here is the answer",
+    "here's the answer",
+    # Arabic hand-over phrasing ("here is the solution / answer", "this is the final solution")
+    "إليك الحل",
+    "اليك الحل",
+    "إليك الإجابة",
+    "اليك الاجابة",
+    "هذا هو الحل",
+    "هذه هي الإجابة",
+)
+
+# Words that, right after "the answer is", make the sentence an EVALUATION of the student's work rather
+# than a reveal of the answer itself.
+_EVALUATIVE_FOLLOWERS = (
+    r"correct|right|wrong|incorrect|close|closer|almost|nearly|partly|partially|mostly|"
+    r"not\b|on\s+the\s+right\s+track|in\s+the\s+right\s+direction|a\s+good\s+start|"
+    r"looking\s+good|getting\s+there|valid|reasonable|plausible|unclear|incomplete|missing"
 )
 
 # Additional phrases only flagged under GUIDED (where even partial answers
@@ -197,12 +217,11 @@ def rule_based_check(
     lowered = draft_response.lower()
 
     # Universal: answer-revealing phrases forbidden under every policy.
-    for phrase in _UNIVERSAL_RED_FLAG_PHRASES:
-        if phrase in lowered:
-            violations.append(
-                f"{policy.value} policy violation: response contains "
-                f"answer-revealing phrase '{phrase}'."
-            )
+    for phrase in find_answer_reveals(draft_response):
+        violations.append(
+            f"{policy.value} policy violation: response contains "
+            f"answer-revealing phrase '{phrase}'."
+        )
 
     # GUIDED-only: additional phrases that are too close to giving the answer.
     if policy == AssistancePolicy.GUIDED:
@@ -227,12 +246,41 @@ def rule_based_check(
 
 # ── Deterministic final-answer enforcement (absolute last line) ───────────
 
-# Compiled pattern that catches "the answer/solution is …" and similar.
+# Compiled pattern that catches "the answer/solution is X" and similar. A possessive determiner ("your
+# answer is", "my solution is", "this answer is") marks talk ABOUT the student's work, and an evaluative
+# follower ("... is correct", "... is almost there") marks feedback; neither reveals anything.
 _ANSWER_REVEAL_PATTERN = re.compile(
-    r"\b(?:the\s+)?(?:correct\s+|final\s+|complete\s+|full\s+)?"
-    r"(?:answer|solution)\s+(?:is|would be|equals?|=)\s",
+    r"(?<![\w'’])(?:(?P<det>the|your|my|this|that|his|her|their|our|its)\s+)?"
+    r"(?:correct\s+|final\s+|complete\s+|full\s+|right\s+)?"
+    r"(?:answer|solution)\s+(?:is|would\s+be|equals?|=)\s+"
+    r"(?!(?:" + _EVALUATIVE_FOLLOWERS + r"))",
     re.IGNORECASE,
 )
+_POSSESSIVE_DETERMINERS = frozenset({"your", "my", "this", "that", "his", "her", "their", "our", "its"})
+
+# Arabic "the (correct/final) answer/solution is ..." (الإجابة / الاجابة / الجواب / الحل ... هي / هو / = / :).
+# The student's own answer is a different word form (إجابتك / حلك), so it never matches.
+_ARABIC_ANSWER_REVEAL_PATTERN = re.compile(
+    r"(?:ال)(?:إجابة|اجابة|أجابة|جواب|حل)\s*(?:ال(?:صحيح[ةه]?|نهائي[ةه]?|كامل[ةه]?))?\s*(?:هي|هو|=|:)\s*"
+    r"(?!(?:صحيح|صح|خطأ|خاطئ|قريب|غير|ليس|ليست))"
+)
+
+
+def find_answer_reveals(text: str) -> list[str]:
+    """Every answer-revealing span in `text` (English or Arabic). Empty when the text only gives
+    feedback on the student's own work. Shared by the rule check, the final enforcement pass and the
+    board/live review so the three layers can never disagree."""
+    if not text:
+        return []
+    lowered = text.lower()
+    hits: list[str] = [p for p in _UNIVERSAL_RED_FLAG_PHRASES if p in lowered]
+    for m in _ANSWER_REVEAL_PATTERN.finditer(text):
+        det = (m.group("det") or "").lower()
+        if det in _POSSESSIVE_DETERMINERS:
+            continue
+        hits.append(m.group(0).strip())
+    hits += [m.group(0).strip() for m in _ARABIC_ANSWER_REVEAL_PATTERN.finditer(text)]
+    return hits
 
 
 def final_answer_enforcement(
@@ -257,23 +305,14 @@ def final_answer_enforcement(
     if not response or not response.strip():
         return False, _SAFE_SOCRATIC_FALLBACK
 
-    lowered = response.lower()
-
-    # Check universal phrases
-    for phrase in _UNIVERSAL_RED_FLAG_PHRASES:
-        if phrase in lowered:
-            logger.warning(
-                "final_answer_enforcement blocked response containing '%s'",
-                phrase,
-            )
-            return False, _SAFE_SOCRATIC_FALLBACK
-
-    # Check regex pattern
-    if _ANSWER_REVEAL_PATTERN.search(response):
+    # Check universal hand-over phrases and "the answer is X" statements (English + Arabic)
+    reveals = find_answer_reveals(response)
+    if reveals:
         logger.warning(
-            "final_answer_enforcement blocked response matching answer-reveal pattern."
+            "final_answer_enforcement blocked response containing '%s'",
+            reveals[0][:80],
         )
-        return False, _SAFE_SOCRATIC_FALLBACK
+        return False, _fallback_for(response)
 
     # Structural code-leak check (programming tasks only) — shared logic,
     # not a second inconsistent implementation.
@@ -287,7 +326,7 @@ def final_answer_enforcement(
             logger.warning(
                 "final_answer_enforcement blocked response due to structural code-leak signal."
             )
-            return False, _SAFE_SOCRATIC_FALLBACK
+            return False, _fallback_for(response)
 
     return True, response
 
@@ -296,6 +335,19 @@ _SAFE_SOCRATIC_FALLBACK = (
     "Let me ask you a different way — can you walk me through your "
     "reasoning step by step? That will help me understand where to guide you."
 )
+_SAFE_SOCRATIC_FALLBACK_AR = (
+    "دعني أسألك بطريقة مختلفة — هل يمكنك أن تشرح لي خطوات تفكيرك خطوة بخطوة؟ "
+    "سيساعدني ذلك على معرفة أين أوجّهك."
+)
+_ARABIC_LETTER = re.compile(r"[\u0600-\u06FF]")
+
+
+def _fallback_for(response: str) -> str:
+    """The safe redirect in the language the reply was written in (Arabic-dominant -> Arabic)."""
+    letters = [c for c in (response or "") if c.isalpha()]
+    if letters and sum(1 for c in letters if _ARABIC_LETTER.match(c)) / len(letters) > 0.5:
+        return _SAFE_SOCRATIC_FALLBACK_AR
+    return _SAFE_SOCRATIC_FALLBACK
 
 
 def llm_check(
@@ -306,6 +358,9 @@ def llm_check(
     intervention_type: str,
     course_material: str,
     draft_response: str,
+    assignment_title: str | None = None,
+    assignment_instructions: str | None = None,
+    student_work: str | None = None,
 ) -> ValidationResult:
     from ai.agents.coach.schemas import ValidationResult
 
@@ -316,6 +371,9 @@ def llm_check(
         intervention_type=intervention_type,
         course_material=course_material,
         draft_response=draft_response,
+        assignment_title=assignment_title,
+        assignment_instructions=assignment_instructions,
+        student_work=student_work,
     )
     llm = get_structured_llm(ModelRole.LIGHTWEIGHT, ValidationResult)
     return llm.invoke(messages)
@@ -331,6 +389,9 @@ def validate_response(
     draft_response: str,
     use_llm: bool = True,
     is_programming: bool = False,
+    assignment_title: str | None = None,
+    assignment_instructions: str | None = None,
+    student_work: str | None = None,
 ) -> ValidationResult:
     """Full validation pass.
 
@@ -356,6 +417,9 @@ def validate_response(
             intervention_type=intervention_type,
             course_material=course_material,
             draft_response=draft_response,
+            assignment_title=assignment_title,
+            assignment_instructions=assignment_instructions,
+            student_work=student_work,
         )
 
         if llm_result is None:

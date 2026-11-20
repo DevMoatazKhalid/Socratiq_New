@@ -10,6 +10,7 @@ from ai.verification.models import (
     VerificationRequest,
     VerificationType,
 )
+from ai.verification.safety import GRADER_DATA_RULE, wrap_student_response
 from ai.verification.strategies.base import BaseVerificationStrategy
 
 _CHALLENGE_SYSTEM = """You are an expert pedagogy system designing a concise 'Adaptation / Modification' verification question.
@@ -61,13 +62,13 @@ class ModifyStrategy(BaseVerificationStrategy):
 
     def build_evaluation_prompt(self, request: VerificationRequest) -> list:
         criteria_str = "\n".join(f"- {c}" for c in request.criteria) if request.criteria else "(Standard modification criteria)"
-        system = SystemMessage(content=_EVALUATION_SYSTEM)
+        system = SystemMessage(content=_EVALUATION_SYSTEM + GRADER_DATA_RULE)
         human = (
             f"Concept: {request.concept}\n"
             f"Challenge Question: {request.challenge_question}\n"
             f"Rubric Criteria:\n{criteria_str}\n\n"
             f"Original Work:\n{request.original_attempt or '(None)'}\n\n"
-            f"Student's Modification Response:\n{request.student_response}\n\n"
+            f"Student's Modification Response:\n{wrap_student_response(request.student_response)}\n\n"
             "Evaluate the student's proposed modification thoroughly."
         )
         return [system, HumanMessage(content=human)]

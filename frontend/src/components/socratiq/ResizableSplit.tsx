@@ -52,7 +52,7 @@ export function ResizableSplit({ left, right, collapsed, defaultPct = 40, leftLa
   const showBoth = collapsed === null
   return (
     <div ref={box} className={cn("flex min-h-0 min-w-0 flex-1", className)} data-testid="workspace-split">
-      <section aria-label={leftLabel} className={cn("flex min-h-0 min-w-0 flex-col", collapsed === "left" && "hidden")} style={{ flexBasis: showBoth ? `${pct}%` : "100%", flexGrow: showBoth ? 0 : 1, flexShrink: 0 }}>
+      <section aria-label={leftLabel} className={cn("flex min-h-0 min-w-0 flex-col overflow-clip", collapsed === "left" && "hidden")} style={{ flexBasis: showBoth ? `${pct}%` : "100%", flexGrow: showBoth ? 0 : 1, flexShrink: 0 }}>
         {left}
       </section>
       {showBoth && (
@@ -73,7 +73,7 @@ export function ResizableSplit({ left, right, collapsed, defaultPct = 40, leftLa
           <span aria-hidden="true" className="absolute inset-y-0 -left-1.5 -right-1.5" />
         </div>
       )}
-      <section aria-label="Board" className={cn("flex min-h-0 min-w-0 flex-1 flex-col", collapsed === "right" && "hidden")}>{right}</section>
+      <section aria-label="Board" className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col overflow-clip", collapsed === "right" && "hidden")}>{right}</section>
     </div>
   )
 }

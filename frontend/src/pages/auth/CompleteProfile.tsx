@@ -14,12 +14,14 @@ export default function CompleteProfile() {
   const navigate = useNavigate()
   const { status, me, completeProfile, signOut } = useAuth()
   const [universities, setUniversities] = useState<{ id: string; name: string }[]>([])
-  const [v, setV] = useState({ firstName: "", lastName: "", role: "STUDENT", universityId: "" })
+  const [v, setV] = useState({ firstName: "", lastName: "", role: "STUDENT", universityId: "", signupCode: "" })
+  const [codeRequired, setCodeRequired] = useState(false)
+  const needsCode = v.role === "PROFESSOR" && codeRequired
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    fetchUniversities().then((r) => setUniversities(r.universities)).catch(() => undefined)
+    fetchUniversities().then((r) => { setUniversities(r.universities); setCodeRequired(Boolean(r.teacher_code_required)) }).catch(() => undefined)
   }, [])
   useEffect(() => {
     if (status === "ready" && me) navigate(homeFor(me.role), { replace: true })
@@ -31,9 +33,11 @@ export default function CompleteProfile() {
     setError(null)
     if (!v.firstName.trim() || !v.lastName.trim()) return setError("Enter your first and last name.")
     if (!v.universityId) return setError("Choose your university.")
+    if (needsCode && !v.signupCode.trim()) return setError("Enter the instructor access code from your institution.")
     setBusy(true)
     try {
-      await completeProfile({ firstName: v.firstName.trim(), lastName: v.lastName.trim(), role: v.role as "STUDENT" | "PROFESSOR", universityId: v.universityId })
+      await completeProfile({ firstName: v.firstName.trim(), lastName: v.lastName.trim(), role: v.role as "STUDENT" | "PROFESSOR", universityId: v.universityId,
+        ...(needsCode ? { signupCode: v.signupCode.trim() } : {}) })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "We couldn't finish setting up your account.")
       setBusy(false)
@@ -58,6 +62,11 @@ export default function CompleteProfile() {
             <option value="PROFESSOR">Instructor</option>
           </Select>
         </Field>
+        {needsCode && (
+          <Field id="cp-code" label="Instructor access code" hint="Your institution gives this to instructors.">
+            <Input {...fieldProps("cp-code")} autoComplete="off" value={v.signupCode} onChange={(e) => setV({ ...v, signupCode: e.target.value })} />
+          </Field>
+        )}
         <Field id="cp-uni" label="University">
           <Select {...fieldProps("cp-uni")} value={v.universityId} onChange={(e) => setV({ ...v, universityId: e.target.value })}>
             <option value="">Select your university…</option>

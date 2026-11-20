@@ -10,6 +10,7 @@ from ai.verification.models import (
     VerificationRequest,
     VerificationType,
 )
+from ai.verification.safety import GRADER_DATA_RULE, wrap_student_response
 from ai.verification.strategies.base import BaseVerificationStrategy
 
 _CHALLENGE_SYSTEM = """You are an expert pedagogy system designing a concise 'Conceptual Transfer' verification question.
@@ -61,12 +62,12 @@ class TransferStrategy(BaseVerificationStrategy):
 
     def build_evaluation_prompt(self, request: VerificationRequest) -> list:
         criteria_str = "\n".join(f"- {c}" for c in request.criteria) if request.criteria else "(Standard transfer criteria)"
-        system = SystemMessage(content=_EVALUATION_SYSTEM)
+        system = SystemMessage(content=_EVALUATION_SYSTEM + GRADER_DATA_RULE)
         human = (
             f"Concept: {request.concept}\n"
             f"Novel Scenario Challenge: {request.challenge_question}\n"
             f"Rubric Criteria:\n{criteria_str}\n\n"
-            f"Student's Transfer Response:\n{request.student_response}\n\n"
+            f"Student's Transfer Response:\n{wrap_student_response(request.student_response)}\n\n"
             "Evaluate the student's conceptual transfer thoroughly."
         )
         return [system, HumanMessage(content=human)]

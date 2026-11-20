@@ -102,7 +102,14 @@ def build_coach_graph(
     graph.add_conditional_edges(
         "generate_response",
         route_after_response_generation,
-        {"validate": "validate", "emit_interaction": "emit_interaction"},
+        # Every value the router can return must be mapped: an assignment-question answer that fails its grounding check is regenerated
+        # once and then replaced by the safe fallback. Those two routes were missing, so that path raised inside the graph.
+        {
+            "validate": "validate",
+            "emit_interaction": "emit_interaction",
+            "generate_response": "generate_response",
+            "safe_fallback": "safe_fallback",
+        },
     )
     graph.add_conditional_edges(
         "validate",
@@ -182,7 +189,13 @@ class Coach:
             board_enabled=board_enabled, board=board, board_mode=board_mode, board_selected_id=board_selected_id, board_intent=board_intent,
             visual_enabled=visual_enabled, visual_followup=visual_followup, persona_id=persona_id,
         )
-        final_state = self._graph.invoke(initial_state)
+        from ai.models.usage import metered
+
+        with metered() as meter:
+            final_state = self._graph.invoke(initial_state)
+        usage = meter.summary()
+        if usage["llm_calls"]:
+            logger.info("coach turn usage session=%s %s", session_id, usage)
         return self._to_result(final_state)
 
     def stream(self, **kwargs):
@@ -226,6 +239,9 @@ class Coach:
         persona_id: Optional[str] = None,
     ) -> CoachState:
         current_attempt = attempt if not message else f"{attempt}\n\nStudent message: {message}"
+        # What enters the conversation history for this turn is what the student SAID, not their whole draft + board again: the draft is
+        # already in the prompt as "Current Attempt", and repeating it in "Recent conversation" doubled the largest input of every call.
+        turn_message = (message or "").strip() or attempt
 
         initial_state: CoachState = {
             "task_context": task_context,
@@ -241,6 +257,7 @@ class Coach:
             "student_context": StudentContext(display_name=(student_name or "").strip() or None),
             "messages": list(conversation or []),
             "current_attempt": current_attempt,
+            "turn_message": turn_message,
             "request_intent": detect_request_intent(message),
             "code_analysis": None,
             "diagnosis": prior_diagnosis,

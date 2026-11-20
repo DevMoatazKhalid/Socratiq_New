@@ -40,8 +40,39 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      # In-chat code runner (optional): start it with `--profile code-runner` and set CODE_RUNNER_URL=http://code-runner:8080 + CODE_RUNNER_TOKEN in .env
+      CODE_RUNNER_URL: ${CODE_RUNNER_URL:-}
     ports: ["${BACKEND_PORT:-8000}:8000"]
     volumes: [uploads:/app/data/uploads]
+    networks: [default, code_runner_net]
+
+  # Executes untrusted student code. Holds NO application secrets, reaches NOTHING but its own internal network (no internet, no database),
+  # and runs every job as a separate unprivileged uid under rlimits + seccomp (see docs/CODE_RUNNER.md). Opt-in:
+  #   docker compose --profile code-runner up --build
+  # Production: run it under gVisor (CODE_RUNNER_RUNTIME=runsc) or on a separate VM; see docs/CODE_RUNNER.md.
+  code-runner:
+    profiles: ["code-runner"]
+    build: ./sandbox/code_runner
+    restart: unless-stopped
+    runtime: ${CODE_RUNNER_RUNTIME:-runc}
+    init: true                                   # reaps orphaned job processes
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777,nosuid,nodev,noexec
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, CHOWN, KILL, DAC_OVERRIDE]   # only to give each job its own uid, and to clean up after it
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 1g
+    cpus: 2
+    environment:
+      RUNNER_MAX_CONCURRENCY: ${RUNNER_MAX_CONCURRENCY:-2}
+      RUNNER_MAX_TIMEOUT_MS: ${RUNNER_MAX_TIMEOUT_MS:-5000}
+      RUNNER_MAX_MEMORY_MB: ${RUNNER_MAX_MEMORY_MB:-256}
+    secrets:
+      - source: code_runner_token
+        target: code_runner_token
+    networks: [code_runner_net]
 
   web:
     build:
@@ -57,3 +88,11 @@ services:
 volumes:
   pgdata:
   uploads:
+
+networks:
+  code_runner_net:
+    internal: true                               # no route to the internet or the host network: only backend <-> code-runner
+
+secrets:
+  code_runner_token:
+    file: ./secrets/code_runner_token            # same value as CODE_RUNNER_TOKEN in .env; `chmod 600` it (see docs/CODE_RUNNER.md)

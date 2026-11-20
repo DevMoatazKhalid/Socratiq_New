@@ -100,9 +100,18 @@ def get_structured_llm(role: ModelRole, schema):
     """
     primary = get_llm(role).with_structured_output(schema)
     fallbacks = [m.with_structured_output(schema) for m in get_fallback_llms(role)]
-    if not fallbacks:
-        return primary
-    return primary.with_fallbacks(fallbacks)
+    runnable = primary.with_fallbacks(fallbacks) if fallbacks else primary
+    return _metered(runnable, role)
+
+
+def _metered(runnable, role: ModelRole):
+    """Attach the usage meter (ai.models.usage). Inheritable callbacks reach every model attempt, fallbacks included. If the runnable does
+    not support configuration (a test double), it is returned unchanged."""
+    try:
+        from ai.models.usage import UsageCallback
+        return runnable.with_config({"callbacks": [UsageCallback(role.value)]})
+    except Exception:  # pragma: no cover - metering must never break a call
+        return runnable
 
 
 def clear_llm_cache() -> None:

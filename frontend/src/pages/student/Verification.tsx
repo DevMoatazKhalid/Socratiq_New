@@ -106,7 +106,7 @@ export default function Verification() {
                       <Badge tone="teal">{LABEL[current.type] ?? current.type}</Badge>
                       <p id="verification-question" className="mt-2 text-[var(--color-ink)]">{current.question}</p>
                     </div>
-                    <textarea
+                    <textarea dir="auto"
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
                       rows={5}

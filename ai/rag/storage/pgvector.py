@@ -25,6 +25,9 @@ from ai.rag.models import (
 logger = logging.getLogger(__name__)
 
 
+MAX_FTS_QUERY_CHARS = 1_000      # an OR query over a few dozen lexemes; longer adds noise, not recall
+
+
 class PgVectorStore:
     """Production vector store using PostgreSQL, pgvector, and PostgreSQL FTS."""
 
@@ -235,23 +238,29 @@ class PgVectorStore:
             with conn.cursor() as cur:
                 cur.execute(
                     """
+                    WITH q AS (
+                        -- OR of the query's lexemes, ranked by how many (and how densely) they match. plainto_tsquery alone ANDs every
+                        -- term, so a multi-sentence Coach query (assignment + concept + student text) matched almost nothing and the
+                        -- "hybrid" search silently degraded to dense-only.
+                        SELECT replace(plainto_tsquery('english', %(query)s)::text, ' & ', ' | ')::tsquery AS tsq
+                    )
                     SELECT chunk_id, university_id, course_id, classroom_id,
                            document_id, title, page_number, section, subsection,
                            concepts, content_type, assignment_ids, chunk_index,
                            created_at, content, token_count,
-                           ts_rank_cd(tsv_content, plainto_tsquery('english', %(query)s)) AS rank
-                    FROM document_chunks
+                           ts_rank_cd(tsv_content, q.tsq, 32) AS rank
+                    FROM document_chunks, q
                     WHERE course_id = %(course_id)s
                       AND (%(university_id)s::text IS NULL OR university_id = %(university_id)s::text)
                       AND (%(classroom_id)s::text IS NULL OR classroom_id = %(classroom_id)s::text OR classroom_id IS NULL)
                       AND (%(assignment_id)s::text IS NULL OR assignment_ids IS NULL OR assignment_ids::jsonb ? %(assignment_id)s::text OR assignment_ids::jsonb = '[]'::jsonb)
                       AND (%(allowed_document_ids)s::text[] IS NULL OR document_id = ANY(%(allowed_document_ids)s::text[]))
-                      AND tsv_content @@ plainto_tsquery('english', %(query)s)
+                      AND tsv_content @@ q.tsq
                     ORDER BY rank DESC
                     LIMIT %(top_k)s;
                     """,
                     {
-                        "query": query,
+                        "query": (query or "")[:MAX_FTS_QUERY_CHARS],
                         "course_id": eff_course,
                         "university_id": eff_uni,
                         "classroom_id": eff_room,

@@ -8,8 +8,16 @@ from dotenv import load_dotenv
 
 
 load_dotenv()
-URL = os.getenv("DATABASE_URL")
-pytestmark = pytest.mark.skipif(not URL, reason="DATABASE_URL not set")
+URL = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
+if URL and ("supabase.co" in URL or "pooler.supabase" in URL):
+    local_admin = os.getenv("TEST_ADMIN_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
+    if "supabase.co" not in local_admin and "pooler.supabase" not in local_admin:
+        from urllib.parse import urlparse, urlunparse
+        p = urlparse(local_admin)
+        URL = urlunparse(p._replace(path="/socratiq_test_template"))
+    else:
+        URL = None
+pytestmark = pytest.mark.skipif(not URL, reason="DATABASE_URL not set or points to production/Supabase")
 
 @pytest.fixture(scope="module")
 def conn():

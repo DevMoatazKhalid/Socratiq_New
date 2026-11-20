@@ -18,6 +18,8 @@ import { PersonaSelector } from "@/components/socratiq/PersonaSelector"
 import { ResizableSplit } from "@/components/socratiq/ResizableSplit"
 import { useMediaQuery } from "@/lib/useMediaQuery"
 import { RichText } from "@/components/ui/RichText"
+import { RunnableCodeBlock } from "@/components/socratiq/RunnableCodeBlock"
+import { SaveToNotesButton } from "@/components/notes/SaveToNotesButton"
 import { Maximize2, MessageSquare, Mic, Minimize2, PenLine, Send, Square, Volume2, VolumeX } from "lucide-react"
 
 type VisualState = { kind: "diagram" | "simulation"; state: "pending" | "placed" | "failed" }
@@ -84,9 +86,18 @@ export default function AiCoach() {
     }
   }, [assignmentQ.data, closed, assignmentId, startAttempt])
 
+  // Follow new messages only while the student is already at (or near) the bottom. Someone reading older messages is never yanked down, and sending a
+  // message always returns them to the latest. While a reply streams we jump instantly (a smooth animation restarted on every token looks like jitter).
+  const stick = useRef(true)
+  const onChatScroll = () => {
+    const el = scrollRef.current
+    if (el) stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
-  }, [messages, thinking])
+    const el = scrollRef.current
+    if (!el || !stick.current) return
+    el.scrollTo({ top: el.scrollHeight, behavior: streaming ? "auto" : "smooth" })
+  }, [messages, thinking, streaming])
 
   async function placeVisual(v: CoachVisual, msgId: string) {
     const ok = (await boardApi.current?.runCoachVisual?.(v)) ?? false
@@ -104,6 +115,7 @@ export default function AiCoach() {
     const text = (override ?? draft).trim()
     if (!text || busy.current || closed) return
     busy.current = true
+    stick.current = true                                             // the student just spoke: show their message and the coming reply
     setError(null)
     setFailedText(null)
     setMessages((m) => [...m, { id: crypto.randomUUID(), role: "student", content: text }])
@@ -262,12 +274,12 @@ export default function AiCoach() {
     </div>
   )
   const chatScroll = (
-    <div ref={scrollRef} id="coach-panel-chat" {...(split ? {} : { role: "tabpanel", "aria-labelledby": "coach-tab-chat" })} tabIndex={0} aria-live="polite" aria-relevant="additions" className={cn("thin-scroll flex-1 space-y-3 overflow-y-auto px-5 py-5", !split && mode === "board" && "hidden")}>
+    <div ref={scrollRef} onScroll={onChatScroll} id="coach-panel-chat" {...(split ? {} : { role: "tabpanel", "aria-labelledby": "coach-tab-chat" })} tabIndex={0} aria-live="polite" aria-relevant="additions" className={cn("thin-scroll flex-1 space-y-3 overflow-y-auto px-5 py-5", !split && mode === "board" && "hidden")}>
       {messages.length === 0 && !history.isPending && (
         <p className="text-center text-sm text-[var(--color-ink-muted)]">Tell SocratiQ where you're stuck, or paste what you've tried so far.</p>
       )}
       {messages.map((m) => (
-        <Bubble key={m.id} message={m} onViewBoard={showBoard} />
+        <Bubble key={m.id} message={m} onViewBoard={showBoard} topic={assignmentQ.data?.topic || assignmentQ.data?.title} />
       ))}
       {thinking && !streaming && (
         <div className="flex justify-start">
@@ -292,7 +304,7 @@ export default function AiCoach() {
     </div>
   )
   const statusBars = (
-    <>
+    <div className="shrink-0">
       {(error || voice.error) && (
         <div role="alert" className="flex items-center justify-between gap-3 border-t border-[var(--color-danger-light)] bg-[var(--color-danger-light)]/40 px-5 py-2 text-sm text-[var(--color-danger-ink)]">
           <span>{error ?? voice.error}</span>
@@ -311,26 +323,41 @@ export default function AiCoach() {
         </div>
       )}
       {closed && <p className="border-t border-[var(--color-border)] px-5 py-2 text-sm text-[var(--color-ink-soft)]">You've submitted this assignment, so the coaching chat is now read-only.</p>}
-    </>
+    </div>
   )
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  // The composer grows with what is typed (up to ~6 lines, then scrolls inside itself) so it never pushes the conversation off-screen or hides text.
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = "auto"
+    if (el.scrollHeight > 0) el.style.height = `${Math.min(el.scrollHeight, 144)}px`
+  }, [draft, split, mode])
   const ctl = dense && !split            // the compact control sizes belong to the old full-screen board mode; the split view keeps the roomy composer
   const composer = (
     <form
-      className={cn("flex items-center gap-2 border-t border-[var(--color-border)]", ctl ? "p-1.5 px-3 bg-white" : "p-3")}
+      className={cn("flex shrink-0 flex-wrap items-end gap-2 border-t border-[var(--color-border)] pb-[max(0.75rem,env(safe-area-inset-bottom))]", ctl ? "p-1.5 px-3 bg-white" : "p-3")}
       onSubmit={(e) => {
         e.preventDefault()
         void handleSend()
       }}
     >
-      <input
+      <textarea
+        ref={inputRef}
+        rows={1}
+        dir="auto"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          // Enter sends, Shift+Enter adds a line. Never while an IME (Arabic, CJK) is still composing a word.
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit() }
+        }}
         disabled={closed}
         maxLength={4000}
         placeholder={!split && mode === "board" ? "Ask SocratiQ about the board, or tell it what to write…" : split ? "Ask SocratiQ, or about what's on the board…" : "Start your chat here…"}
         className={cn(
-          "min-w-0 flex-1 rounded-full border border-[var(--color-control-border)] bg-white px-3.5 text-sm placeholder:text-[var(--color-ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-teal-dark)] disabled:opacity-60",
-          ctl ? "h-9 text-xs sm:text-sm" : "h-11"
+          "min-w-0 resize-none rounded-[1.25rem] border max-sm:basis-full sm:flex-1 py-2 leading-5 border-[var(--color-control-border)] bg-white px-3.5 text-sm placeholder:text-[var(--color-ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-teal-dark)] disabled:opacity-60",
+          ctl ? "min-h-9 text-xs sm:text-sm" : "min-h-11"
         )}
         aria-label="Message SocratiQ AI"
       />
@@ -388,7 +415,8 @@ export default function AiCoach() {
   return (
     <AppShell
       role="student"
-      mainClassName={dense ? "p-0 flex flex-col flex-1 h-[calc(100dvh-3.5rem)] overflow-hidden" : undefined}
+      fitViewport
+      mainClassName={dense ? "p-0" : "p-3 sm:p-4 lg:p-8"}
       crumbs={[
         { label: "Courses", to: "/student/courses" },
         { label: course.data?.course.name ?? "Course", to: `/student/courses/${courseId}` },
@@ -398,7 +426,7 @@ export default function AiCoach() {
     >
       <QueryState query={assignmentQ} what="Assignment">
         {() => (
-          <div className={cn("flex flex-col overflow-hidden bg-white transition-all duration-300", dense ? "w-full h-full border-none rounded-none flex-1" : "mx-auto max-w-3xl rounded-[var(--radius-lg)] border border-[var(--color-border)] h-[calc(100dvh-8.5rem)] min-h-[26rem]")}>
+          <div className={cn("flex min-h-0 flex-1 flex-col overflow-hidden bg-white", dense ? "w-full rounded-none border-none" : "mx-auto w-full max-w-3xl rounded-[var(--radius-lg)] border border-[var(--color-border)]")}>
             {header}
             {split ? (
               <ResizableSplit
@@ -423,9 +451,10 @@ export default function AiCoach() {
   )
 }
 
-function Bubble({ message, onViewBoard }: { message: Local; onViewBoard: () => void }) {
+function Bubble({ message, onViewBoard, topic }: { message: Local; onViewBoard: () => void; topic?: string }) {
   const isStudent = message.role === "student"
   const cites = (message.sources ?? []).filter((s) => s.documentTitle)
+  const final = !isStudent && !message.id.startsWith("streaming-")          // a reply still arriving is not runnable or saveable yet
   return (
     <div className={cn("flex", isStudent ? "justify-end" : "justify-start")}>
       <div
@@ -434,7 +463,11 @@ function Bubble({ message, onViewBoard }: { message: Local; onViewBoard: () => v
           isStudent ? "bg-[var(--color-teal-light)] text-[var(--color-ink)]" : "bg-[var(--color-surface-muted)] text-[var(--color-ink)]"
         )}
       >
-        <RichText text={message.content} detectCode={isStudent} />
+        <RichText
+          text={message.content}
+          detectCode={isStudent}
+          renderCodeBlock={final ? (code, lang, i) => <RunnableCodeBlock code={code} lang={lang} blockKey={`${message.id}:${i}`} /> : undefined}
+        />
         {!isStudent && message.boardCount ? (
           <button type="button" onClick={onViewBoard} className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-teal-dark)]/30 bg-white px-2.5 py-1 text-xs font-medium text-[var(--color-teal-dark)] hover:bg-[var(--color-teal-light)]">
             <PenLine className="h-3.5 w-3.5" aria-hidden="true" />Wrote {message.boardCount} {message.boardCount === 1 ? "item" : "items"} on the board · View board
@@ -454,6 +487,7 @@ function Bubble({ message, onViewBoard }: { message: Local; onViewBoard: () => v
             From course material: {cites.map((s) => `${s.documentTitle}${s.pageNumber ? ` (p. ${s.pageNumber})` : ""}`).join(", ")}
           </p>
         )}
+        {final && message.content.trim() && <SaveToNotesButton messageId={message.id} content={message.content} topic={topic} />}
       </div>
     </div>
   )

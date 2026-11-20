@@ -4,13 +4,16 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const ARTIFACTS_DIR = '/home/mohab-mosad/Learn/Ai Hakathon/سعاد حسني/SocratiQ_V2/Socratiq_New-main/browser_artifacts';
+// Resolved relative to this script (frontend/ -> repo root) so it works on any machine; override with BROWSER_ARTIFACTS_DIR.
+const ARTIFACTS_DIR = process.env.BROWSER_ARTIFACTS_DIR || path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', 'browser_artifacts');
 if (!fs.existsSync(ARTIFACTS_DIR)) {
   fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
 }
 
 const SUPABASE_URL = 'https://ydivejlvcrkotwlmffmi.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkaXZlamx2Y3Jrb3R3bG1mZm1pIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4OTg5OTI3MSwiZXhwIjoyMTA1NDc1MjcxfQ.prfVTQjPx4TDa17I9Ecs9XOR48X4yZEQy3RBtVqHMxg';
+// Never commit keys. Provide the project's public ANON key via the environment (SUPABASE_ANON_KEY=... node run_browser_mission_a.mjs).
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+if (!SUPABASE_ANON_KEY) { console.error('SUPABASE_ANON_KEY is not set; refusing to run.'); process.exit(2); }
 
 const TEST_EMAIL = 'test_student_e2e@socratiq.ai';
 const TEST_PASSWORD = 'TestPassword123!';
@@ -216,9 +219,9 @@ async function run() {
     }
 
     // -------------------------------------------------------------
-    // Test Suite 5: Teaching Persona UI & Arabic Localization
+    // Test Suite 5: Teaching Persona UI (English-only)
     // -------------------------------------------------------------
-    console.log('\n--- Running Test Suite 5: Teaching Persona UI & Arabic Localization ---');
+    console.log('\n--- Running Test Suite 5: Teaching Persona UI (English-only) ---');
     const personaButton = await page.$('button[aria-haspopup="dialog"]');
     const initialPersonaText = await personaButton.innerText();
     record('Suite 5', 'Persona button displays teaching style label', initialPersonaText.includes('Teaching style:'));
@@ -228,29 +231,22 @@ async function run() {
     await page.waitForSelector('[role="dialog"][aria-label="Choose a teaching style"]', { timeout: 5000 });
     record('Suite 5', 'Persona selection dialog opened with role=dialog', true);
 
-    // Verify all 5 personas rendered with Arabic text
+    // Verify all 5 personas rendered
     const radios = await page.$$('[role="radio"]');
     record('Suite 5', 'Dialog renders 5 teaching personas as radio options', radios.length === 5);
 
-    // Verify Arabic translations exist with dir="rtl" and lang="ar"
-    const arabicSpans = await page.$$('[role="dialog"] span[dir="rtl"][lang="ar"]');
-    record('Suite 5', 'Persona dialog renders Arabic strings with dir=rtl and lang=ar', arabicSpans.length >= 10, `Found ${arabicSpans.length} Arabic elements`);
+    // The application UI is English-only: no Arabic strings and no RTL spans may be rendered inside the selector.
+    const arabicSpans = await page.$$('[role="dialog"] [lang="ar"], [role="dialog"] [dir="rtl"]');
+    record('Suite 5', 'Persona dialog renders no Arabic / RTL UI strings', arabicSpans.length === 0, `Found ${arabicSpans.length} Arabic elements`);
 
-    // Verify Arabic name strings
-    const arabicTexts = await Promise.all(arabicSpans.map(el => el.innerText()));
-    const hasSocraticArabic = arabicTexts.some(t => t.includes('المرشد السقراطي'));
-    const hasEngineerArabic = arabicTexts.some(t => t.includes('المهندس العملي'));
-    const hasThinkerArabic = arabicTexts.some(t => t.includes('المفكّر الناقد'));
-    const hasMentorArabic = arabicTexts.some(t => t.includes('المعلّم الصبور'));
-    const hasExplorerArabic = arabicTexts.some(t => t.includes('المستكشف البصري'));
+    const dialogText = await page.locator('[role="dialog"][aria-label="Choose a teaching style"]').innerText();
+    record('Suite 5', 'Persona dialog text contains no Arabic characters', !/[\u0600-\u06FF]/.test(dialogText));
 
-    record('Suite 5', 'All 5 authentic Arabic persona names present',
-      hasSocraticArabic && hasEngineerArabic && hasThinkerArabic && hasMentorArabic && hasExplorerArabic,
-      'Verified: المرشد السقراطي, المهندس العملي, المفكّر الناقد, المعلّم الصبور, المستكشف البصري'
-    );
+    const englishNames = ['The Socratic Guide', 'The Patient Mentor', 'The Practical Engineer', 'The Critical Thinker', 'The Visual Explorer'];
+    record('Suite 5', 'All 5 English persona names present', englishNames.every(n => dialogText.includes(n)), englishNames.join(', '));
 
-    await page.screenshot({ path: path.join(ARTIFACTS_DIR, 'e2e_08_persona_selector_arabic.png') });
-    console.log('✓ Captured screenshot: e2e_08_persona_selector_arabic.png');
+    await page.screenshot({ path: path.join(ARTIFACTS_DIR, 'e2e_08_persona_selector_english.png') });
+    console.log('✓ Captured screenshot: e2e_08_persona_selector_english.png');
 
     // Click 'Practical Engineer' option
     const engineerRadio = radios[2]; // practical_engineer
