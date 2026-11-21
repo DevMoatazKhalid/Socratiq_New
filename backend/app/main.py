@@ -21,7 +21,7 @@ from .files.pipeline import FilePipeline
 from .files.storage import LocalObjectStorage, build_storage
 from .files.worker import IngestWorker
 from .code_runner import build_code_service
-from .routers import ai, auth_users, code, files, health, notes, smartboard, student, teacher, verification
+from .routers import ai, auth_users, code, files, health, insights, notes, smartboard, student, teacher, verification
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("socratiq")
@@ -147,7 +147,7 @@ def create_app(*, db: Optional[Database] = None, storage: Any = None, token_veri
         return _err(request, 500, "Something went wrong on our side.", "internal_error")     # never leak internals
 
     app.include_router(health.router)
-    for r in (auth_users.router, files.router, student.router, notes.router, code.router, verification.router, ai.router, teacher.router, smartboard.router):
+    for r in (auth_users.router, files.router, student.router, notes.router, code.router, verification.router, ai.router, teacher.router, smartboard.router, insights.router):
         app.include_router(r, prefix="/api/v1")
     return app
 

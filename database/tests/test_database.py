@@ -57,7 +57,7 @@ def ids(conn, sql, *params):
 # ------------------------------------------------------------------ deployability / idempotency
 def test_all_migrations_applied_and_tracked(db):
     names = ids(db, "select filename from schema_migrations")
-    assert names[0].startswith("000_") and names[-1].startswith("018_") and len(names) == 19
+    assert names[0].startswith("000_") and names[-1].startswith("019_") and len(names) == 20
 
 
 def _fingerprint(conn):
@@ -497,8 +497,11 @@ def test_updated_at_moves_and_deleting_a_student_removes_their_notes(db):
 def test_down_migration_removes_only_the_notes_table_and_018_can_be_reapplied(db):
     _seed(db)
     before = db.execute("SELECT count(*) FROM students").fetchone()[0]
+    # 019 (notes board) builds on student_notes, so it is reversed first, newest migration first
+    db.execute((dbtools.run_migrations.MIGRATIONS_DIR / "down" / "019_notes_board.down.sql").read_text())
     db.execute((dbtools.run_migrations.MIGRATIONS_DIR / "down" / "018_student_notes.down.sql").read_text())
     assert db.execute("SELECT to_regclass('public.student_notes')").fetchone()[0] is None
+    assert db.execute("SELECT to_regclass('public.student_note_groups')").fetchone()[0] is None
     assert db.execute("SELECT count(*) FROM students").fetchone()[0] == before
-    assert dbtools.run_migrations.run(dbtools.url_for(db.info.dbname)) == ["018_student_notes.sql"]
+    assert dbtools.run_migrations.run(dbtools.url_for(db.info.dbname)) == ["018_student_notes.sql", "019_notes_board.sql"]
     assert db.execute("SELECT count(*) FROM pg_policies WHERE tablename='student_notes'").fetchone()[0] == 4

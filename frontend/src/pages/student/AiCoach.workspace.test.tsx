@@ -62,13 +62,13 @@ describe("wide screen: one workspace", () => {
 
   it("collapsing a panel hides it without unmounting it, and 'show both' restores the split", () => {
     mount()
-    fireEvent.click(screen.getByRole("button", { name: "Expand Board" }))
+    fireEvent.click(screen.getByRole("button", { name: "Board" }))
     expect(hidden(screen.getByText(/Tell SocratiQ where you're stuck/))).toBe(true)
     expect(hidden(screen.getByRole("toolbar", { hidden: true }))).toBe(false)
     expect(screen.queryByRole("separator")).toBeNull()
-    fireEvent.click(screen.getByRole("button", { name: "Show both panels" }))
+    fireEvent.click(screen.getByRole("button", { name: "Chat + Board" }))
     expect(screen.getByRole("separator")).toBeTruthy()
-    fireEvent.click(screen.getByRole("button", { name: "Expand Conversation" }))
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }))
     expect(hidden(screen.getByRole("toolbar", { hidden: true }))).toBe(true)
     expect(hidden(screen.getByText(/Tell SocratiQ where you're stuck/))).toBe(false)
   })

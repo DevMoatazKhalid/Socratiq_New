@@ -19,8 +19,17 @@ import StudentAssignmentDetail from "@/pages/student/AssignmentDetail"
 import AiCoach from "@/pages/student/AiCoach"
 import Verification from "@/pages/student/Verification"
 import JoinCourse from "@/pages/student/JoinCourse"
+import MyWork from "@/pages/student/MyWork"
+import Notes from "@/pages/student/Notes"
+import NoteNew from "@/pages/student/NoteNew"
+import NoteGroupNew from "@/pages/student/NoteGroupNew"
 
 import TeacherDashboard from "@/pages/teacher/Dashboard"
+import TeacherReview from "@/pages/teacher/Review"
+import GradeWork from "@/pages/teacher/GradeWork"
+import TeacherStudents from "@/pages/teacher/Students"
+import TeacherAssignments from "@/pages/teacher/Assignments"
+import TeacherInsights from "@/pages/teacher/Insights"
 import StudentDetail from "@/pages/teacher/StudentDetail"
 import TeacherCourses from "@/pages/teacher/Courses"
 import TeacherCourseDetail from "@/pages/teacher/CourseDetail"
@@ -29,7 +38,6 @@ import TeacherMaterialDetail from "@/pages/teacher/MaterialDetail"
 import CreateCourse from "@/pages/teacher/CreateCourse"
 import NewAssignment from "@/pages/teacher/NewAssignment"
 import UploadMaterial from "@/pages/teacher/UploadMaterial"
-import SubmissionReview from "@/pages/teacher/SubmissionReview"
 import SmartBoardDemo from "@/pages/SmartBoardDemo"
 
 export default function App() {
@@ -48,6 +56,10 @@ export default function App() {
 
       <Route path="/student" element={<RequireAuth role="student"><StudentHome /></RequireAuth>} />
       <Route path="/student/join" element={<RequireAuth role="student"><JoinCourse /></RequireAuth>} />
+      <Route path="/student/work" element={<RequireAuth role="student"><MyWork /></RequireAuth>} />
+      <Route path="/student/notes" element={<RequireAuth role="student"><Notes /></RequireAuth>} />
+      <Route path="/student/notes/new" element={<RequireAuth role="student"><NoteNew /></RequireAuth>} />
+      <Route path="/student/notes/groups/new" element={<RequireAuth role="student"><NoteGroupNew /></RequireAuth>} />
       <Route path="/student/courses" element={<RequireAuth role="student"><StudentCourses /></RequireAuth>} />
       <Route path="/student/courses/:courseId" element={<RequireAuth role="student"><StudentCourseDetail /></RequireAuth>} />
       <Route path="/student/courses/:courseId/materials/:materialId" element={<RequireAuth role="student"><StudentMaterialDetail /></RequireAuth>} />
@@ -57,6 +69,11 @@ export default function App() {
       <Route path="/student/settings" element={<RequireAuth role="student"><Settings role="student" /></RequireAuth>} />
 
       <Route path="/teacher" element={<RequireAuth role="teacher"><TeacherDashboard /></RequireAuth>} />
+      <Route path="/teacher/review" element={<RequireAuth role="teacher"><TeacherReview /></RequireAuth>} />
+      <Route path="/teacher/grade" element={<RequireAuth role="teacher"><GradeWork /></RequireAuth>} />
+      <Route path="/teacher/students" element={<RequireAuth role="teacher"><TeacherStudents /></RequireAuth>} />
+      <Route path="/teacher/assignments" element={<RequireAuth role="teacher"><TeacherAssignments /></RequireAuth>} />
+      <Route path="/teacher/insights" element={<RequireAuth role="teacher"><TeacherInsights /></RequireAuth>} />
       <Route path="/teacher/students/:studentId" element={<RequireAuth role="teacher"><StudentDetail /></RequireAuth>} />
       <Route path="/teacher/courses" element={<RequireAuth role="teacher"><TeacherCourses /></RequireAuth>} />
       <Route path="/teacher/courses/new" element={<RequireAuth role="teacher"><CreateCourse /></RequireAuth>} />
@@ -64,7 +81,7 @@ export default function App() {
       <Route path="/teacher/courses/:courseId/assignments/new" element={<RequireAuth role="teacher"><NewAssignment /></RequireAuth>} />
       <Route path="/teacher/courses/:courseId/materials/new" element={<RequireAuth role="teacher"><UploadMaterial /></RequireAuth>} />
       <Route path="/teacher/courses/:courseId/assignments/:assignmentId" element={<RequireAuth role="teacher"><TeacherAssignmentDetail /></RequireAuth>} />
-      <Route path="/teacher/courses/:courseId/assignments/:assignmentId/submissions/:studentId" element={<RequireAuth role="teacher"><SubmissionReview /></RequireAuth>} />
+      <Route path="/teacher/courses/:courseId/assignments/:assignmentId/submissions/:studentId" element={<RequireAuth role="teacher"><GradeWork /></RequireAuth>} />
       <Route path="/teacher/courses/:courseId/materials/:materialId" element={<RequireAuth role="teacher"><TeacherMaterialDetail /></RequireAuth>} />
       <Route path="/teacher/settings" element={<RequireAuth role="teacher"><Settings role="teacher" /></RequireAuth>} />
 

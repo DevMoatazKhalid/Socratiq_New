@@ -46,7 +46,7 @@ export default function CompleteProfile() {
 
   return (
     <AuthLayout wide>
-      <h1 className="text-center text-lg font-semibold text-[var(--color-ink)]">Finish setting up your account</h1>
+      <h1 className="text-center font-serif text-[28px] font-bold leading-tight text-[var(--color-ink)]">Finish setting up your account</h1>
       <form className="mt-6 space-y-4" onSubmit={submit} noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="cp-first" label="First name">

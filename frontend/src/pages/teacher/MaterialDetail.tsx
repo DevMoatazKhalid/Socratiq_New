@@ -34,7 +34,7 @@ export default function TeacherMaterialDetail() {
             <Card className="max-w-2xl">
               <CardContent>
                 <div className="flex items-start justify-between gap-3">
-                  <h1 className="text-lg font-semibold text-[var(--color-ink)]">{m.title}</h1>
+                  <h1 className="ds-h1">{m.title}</h1>
                   {st && <Badge tone={st.tone}>{st.text}</Badge>}
                 </div>
                 <p className="mt-3 text-sm text-[var(--color-ink-soft)]">{m.summary}</p>

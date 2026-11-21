@@ -10,7 +10,8 @@ import { MasteryBadge } from "@/components/socratiq/MasteryBadge"
 import { RiskPanel } from "@/components/socratiq/RiskPanel"
 import { StudentSkeleton } from "@/components/socratiq/Skeletons"
 import { AiUsagePanel, AssignmentProgress, ConceptPanel, LearningTimeline, VerificationPanel, reviewPath } from "@/components/socratiq/StudentSections"
-import { useCourses, useTeacherStudent } from "@/lib/queries"
+import { useCourses, useTeacherInsights, useTeacherStudent } from "@/lib/queries"
+import { Kpi } from "@/components/ds"
 import type { Course } from "@/types"
 import { relativeTime } from "@/lib/time"
 
@@ -24,9 +25,10 @@ export default function StudentDetail() {
   const { studentId = "" } = useParams()
   const q = useTeacherStudent(studentId)
   const allCourses = useCourses("teacher").data ?? []
+  const insights = useTeacherInsights(q.data?.courseIds[0])
 
   return (
-    <AppShell role="teacher" crumbs={[{ label: "Dashboard", to: "/teacher" }, { label: q.data?.name ?? "Student" }]}>
+    <AppShell role="teacher" crumbs={[{ label: "Students", to: "/teacher/students" }, { label: q.data?.name ?? "Student" }]}>
       <QueryState query={q} what="Student" skeleton={<StudentSkeleton />}>
         {(student) => {
           const courses = student.courseIds.map((id) => allCourses.find((c) => c.id === id)).filter((c): c is Course => c !== undefined)
@@ -35,8 +37,9 @@ export default function StudentDetail() {
           const submissionLink = (assignmentId: string) => (courseOf[assignmentId] ? reviewPath(courseOf[assignmentId], assignmentId, student.id) : null)
           const latest = student.assignments.find((a) => a.submitted)
           const submitted = student.assignments.filter((a) => a.submitted).length
+          const per = insights.data?.students.find((x) => x.id === student.id)
           return (
-            <div className="mx-auto max-w-7xl space-y-5">
+            <div className="space-y-5">
               <PageIntro
                 leading={<Avatar name={student.name} className="h-14 w-14 text-base" />}
                 eyebrow="Student"
@@ -57,11 +60,19 @@ export default function StudentDetail() {
                 }
               />
 
-              <nav aria-label="On this page" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                {SECTIONS.map(([id, label]) => (
-                  <a key={id} href={`#${id}`} className="shrink-0 rounded-full border border-[var(--color-border-strong)] bg-white px-3 py-1 text-sm text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]">{label}</a>
-                ))}
+              <nav aria-label="On this page" className="ds-tabs">
+                {SECTIONS.map(([id, label]) => <a key={id} href={`#${id}`} className="ds-tab">{label}</a>)}
               </nav>
+
+              {/* Three lenses, shown side by side and never combined into one score (approved design). */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <Kpi label="Academic performance" value={per?.averageGrade == null ? "—" : `${Math.round(per.averageGrade)}%`}
+                  hint={per ? `Average of ${per.graded} graded assignment${per.graded === 1 ? "" : "s"}${per.awaiting ? ` · ${per.awaiting} not graded` : ""}` : "Graded work only"} />
+                <Kpi label="Learning understanding" value={per?.verificationRate == null ? "—" : `${per.verificationRate}%`}
+                  hint={`Verification success · ${student.verification.length} run${student.verification.length === 1 ? "" : "s"}`} />
+                <Kpi label="Engagement" value={`${student.aiUsage.interactions} turns`} hint={`AI Coach usage · ${student.revisions} revision${student.revisions === 1 ? "" : "s"}`} />
+              </div>
+              <p className="-mt-2 text-xs text-[var(--color-ink-muted)]">Three lenses are shown separately and never combined into one score.</p>
 
               <RiskPanel risk={student.risk} assignmentTitles={titles} submissionLink={submissionLink} />
 

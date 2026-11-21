@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from "react"
 import { useLocation } from "react-router-dom"
-import { ArrowDown, ArrowRight, BookOpen, ClipboardList, Eye, FileText, GraduationCap, LayoutDashboard, MessageCircle, RefreshCw, ShieldCheck, Users } from "lucide-react"
+import { ArrowDown, ArrowRight, BookOpen, ClipboardList, Eye, FileText, GraduationCap, LayoutDashboard, MessageCircle, PanelsTopLeft, RefreshCw, ShieldCheck, Sparkles, Users } from "lucide-react"
 import { PublicHeader } from "@/components/layout/PublicHeader"
 import { PublicFooter } from "@/components/layout/PublicFooter"
 import { ProductPreviews } from "@/components/landing/ProductPreviews"
@@ -174,6 +174,75 @@ function Students() {
   )
 }
 
+function SmartBoard() {
+  const points = [
+    { icon: PanelsTopLeft, title: "Chat and board side by side", body: "Keep the conversation on one side and think visually on the other. Both belong to the same Coach session." },
+    { icon: Sparkles, title: "Ask for a diagram, image or simulation", body: "Select what you drew and ask the AI to turn it into a diagram, add an illustration or run a small simulation." },
+    { icon: MessageCircle, title: "Ask about what's on the board", body: "Have SocratiQ explain, continue, correct, summarise or organise your sketch, one step at a time." },
+    { icon: Eye, title: "Visible to the instructor", body: "The board is saved with the assignment, and instructors can open it read-only next to the submission when grading." },
+  ]
+  return (
+    <section id="smart-board" className={cn("scroll-mt-20", sectionPad)}>
+      <div className={cn(container, "grid items-center gap-12 lg:grid-cols-[5fr_6fr] lg:gap-16")}>
+        <div>
+          <SectionIntro title="A Smart Board for the thinking that doesn't fit in a sentence">
+            Trees, graphs, proofs and circuits are easier to reason about when you can draw them. The Smart Board sits right next to the Coach.
+          </SectionIntro>
+          <ul className="mt-10 space-y-6">
+            {points.map((p, i) => (
+              <Reveal as="li" key={p.title} delay={i * 90} className="flex gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--color-ink)] ring-1 ring-[var(--color-border-strong)]"><p.icon className="h-5 w-5" aria-hidden="true" /></span>
+                <span>
+                  <span className="block font-semibold text-[var(--color-ink)]">{p.title}</span>
+                  <span className="mt-1 block leading-relaxed text-[var(--color-ink-muted)]">{p.body}</span>
+                </span>
+              </Reveal>
+            ))}
+          </ul>
+        </div>
+        <Reveal><BoardIllustration /></Reveal>
+      </div>
+    </section>
+  )
+}
+
+/** Decorative sketch of the Chat + Board workspace (same chips and colours as the real board). Not a screenshot. */
+function BoardIllustration() {
+  return (
+    <figure className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-canvas)] shadow-[0_20px_50px_-24px_rgb(60_40_10/0.35)]">
+      <div aria-hidden="true" className="grid sm:grid-cols-[2fr_3fr]">
+        <div className="space-y-3 border-b border-[var(--color-border)] bg-white p-4 text-[13px] leading-snug sm:border-b-0 sm:border-r">
+          <p className="ml-auto w-fit rounded-2xl bg-[#fdebd7] px-3 py-2 text-[var(--color-ink)]">Why does my tree get so tall?</p>
+          <p className="rounded-2xl border border-[var(--color-border)] px-3 py-2 text-[var(--color-ink)]">Try inserting 1, 2, 3, 4 in order. Draw where each one goes. What shape do you get?</p>
+          <p className="ml-auto w-fit rounded-2xl bg-[#fdebd7] px-3 py-2 text-[var(--color-ink)]">A straight line…</p>
+        </div>
+        <div className="relative min-h-[260px] bg-white sm:min-h-[300px] [background-image:radial-gradient(#e5e2d6_1px,transparent_1px)] [background-size:18px_18px]">
+          <svg viewBox="0 0 320 260" className="absolute inset-0 h-full w-full" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <g stroke="#a4a060" strokeWidth="2.5">
+              <path d="M70 42 L105 70" /><path d="M125 90 L160 118" /><path d="M180 138 L215 166" />
+            </g>
+            {[[60, 32, "1"], [115, 80, "2"], [170, 128, "3"], [225, 176, "4"]].map(([x, y, t]) => (
+              <g key={t as string}>
+                <circle cx={x as number} cy={y as number} r="17" fill="#fff8f3" stroke="#fa9500" strokeWidth="2.5" />
+                <text x={x as number} y={(y as number) + 5} textAnchor="middle" fontSize="15" fontWeight="700" fill="#141102">{t}</text>
+              </g>
+            ))}
+            <path d="M262 60 C 292 80, 292 140, 262 170" stroke="#eb6424" strokeWidth="2" strokeDasharray="4 5" />
+            <text x="218" y="48" fontSize="13" fill="#eb6424" fontWeight="600">height = n</text>
+          </svg>
+          <div className="absolute inset-x-3 bottom-3 flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-white p-1 text-xs shadow-sm">
+            <span className="rounded-full bg-[#e7f1ee] px-2.5 py-1 font-semibold text-[var(--color-teal-dark)]">Diagram</span>
+            <span className="px-2 py-1 text-[var(--color-ink-muted)]">Image</span>
+            <span className="px-2 py-1 text-[var(--color-ink-muted)]">Simulate</span>
+            <span className="ml-1 min-w-0 flex-1 truncate rounded-full border border-[var(--color-border)] px-3 py-1 text-[var(--color-ink-muted)]">Ask AI to draw a diagram…</span>
+          </div>
+        </div>
+      </div>
+      <figcaption className="border-t border-[var(--color-border)] bg-white px-5 py-3 text-sm text-[var(--color-ink-muted)]">Illustration of the Chat + Board workspace.</figcaption>
+    </figure>
+  )
+}
+
 function Teachers() {
   return (
     <section id="teachers" className={cn("scroll-mt-20 bg-white", sectionPad)}>
@@ -228,7 +297,7 @@ function Preview() {
     <section id="product" className={cn("scroll-mt-20", sectionPad)}>
       <div className={container}>
         <SectionIntro title="A look inside">
-          One workspace for students and instructors, in the same visual language on both sides.
+          One workspace for students and instructors, in the same visual language on both sides. These are screens from the app itself.
         </SectionIntro>
         <div className="mt-12"><ProductPreviews /></div>
       </div>
@@ -272,6 +341,7 @@ export default function Landing() {
         <HowItWorks />
         <Students />
         <Teachers />
+        <SmartBoard />
         <Evidence />
         <Preview />
         <FinalCta />

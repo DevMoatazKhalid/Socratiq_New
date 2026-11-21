@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { useParams } from "react-router-dom"
 import { AppShell } from "@/components/layout/AppShell"
 import { Button } from "@/components/ui/Button"
-import { DueDate } from "@/components/socratiq/DueDate"
+import { dueInfo } from "@/lib/dates"
 import { QueryState } from "@/components/ui/States"
 import { sendCoachStream, type CoachVisual, useCoachHistory, useStartAttempt, useStudentAssignment, useStudentCourse, useWhiteboard } from "@/lib/queries"
 import { useWhiteboardRealtimeSync } from "@/lib/realtime"
@@ -20,7 +20,7 @@ import { useMediaQuery } from "@/lib/useMediaQuery"
 import { RichText } from "@/components/ui/RichText"
 import { RunnableCodeBlock } from "@/components/socratiq/RunnableCodeBlock"
 import { SaveToNotesButton } from "@/components/notes/SaveToNotesButton"
-import { Maximize2, MessageSquare, Mic, Minimize2, PenLine, Send, Square, Volume2, VolumeX } from "lucide-react"
+import { Clock, Columns2, MessageSquare, Mic, PenLine, Send, Square, Volume2, VolumeX } from "lucide-react"
 
 type VisualState = { kind: "diagram" | "simulation"; state: "pending" | "placed" | "failed" }
 type Local = ChatMessage & { sources?: { documentTitle?: string; pageNumber?: number }[]; boardCount?: number; visual?: VisualState }
@@ -193,40 +193,36 @@ export default function AiCoach() {
   const lastCoach = [...messages].reverse().find((m) => m.role === "coach")
 
   const header = (
-    <div className={cn("flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--color-border)]", dense ? "px-4 py-2" : "px-5 py-3")}>
+    <div className={cn("flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--color-border)] bg-[#fff4ee]", dense ? "px-4 py-2 lg:px-7 lg:py-2.5" : "px-5 py-3")}>
       <div className="min-w-0 flex-1 basis-48">
         <div className="min-w-0">
           <div className="flex min-w-0 items-baseline gap-2">
             <p className="shrink-0 text-xs font-semibold text-[var(--color-teal-dark)]">Learning coach</p>
             <span className="shrink-0 text-xs text-[var(--color-ink-faint)]" aria-hidden="true">•</span>
-            <h1 className="min-w-0 truncate text-sm font-semibold text-[var(--color-ink)] sm:text-base" title={assignmentQ.data?.topic || assignmentQ.data?.title}>{assignmentQ.data?.topic || assignmentQ.data?.title}</h1>
+            <h1 className="min-w-0 truncate text-sm font-semibold text-[var(--color-ink)] sm:text-lg sm:font-bold" title={assignmentQ.data?.topic || assignmentQ.data?.title}>{assignmentQ.data?.topic || assignmentQ.data?.title}</h1>
           </div>
           <div className={cn(dense ? "mt-0.5" : "mt-1.5")}>
-            <DueDate dueDate={assignmentQ.data?.dueDate} done={closed} />
+            <CoachDue dueDate={assignmentQ.data?.dueDate} done={closed} />
           </div>
         </div>
       </div>
       <PersonaSelector assignmentId={assignmentId} disabled={!!thinking} compact={dense} />
       {split ? (
-        <div role="group" aria-label="Workspace panels" className="inline-flex shrink-0 gap-1">
-          {([["left", "Conversation", MessageSquare], ["right", "Board", PenLine]] as const).map(([side, label, Icon]) => {
-            const hidden = collapsed === side
-            const other = side === "left" ? "right" : "left"
-            return (
-              <button
-                key={side} type="button" aria-pressed={!hidden} aria-label={hidden ? `Show ${label}` : collapsed === other ? `Show both panels` : `Expand ${label}`}
-                title={hidden ? `Show ${label}` : collapsed === other ? "Show both panels" : `Expand ${label} (hide the other panel)`}
-                onClick={() => { voice.cancelListening(); voice.stopSpeaking(); setCollapsed(hidden || collapsed === other ? null : other) }}
-                className="flex min-h-9 items-center gap-1.5 rounded-full border border-[var(--color-control-border)] bg-white px-3 text-sm font-medium text-[var(--color-ink-soft)] hover:bg-[var(--color-surface-muted)] aria-pressed:text-[var(--color-teal-dark)]"
-              >
-                <Icon className="h-4 w-4" aria-hidden="true" />{label}
-                {collapsed === other ? <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" /> : !hidden ? <Maximize2 className="h-3.5 w-3.5 opacity-60" aria-hidden="true" /> : null}
-              </button>
-            )
-          })}
+        // Approved design: one segmented control for the workspace layout. Chat = conversation only, Chat + Board = split, Board = board only.
+        // Panels are hidden, never unmounted, so the board and the conversation keep their state.
+        <div role="group" aria-label="Workspace panels" className="ds-seg shrink-0">
+          {([["Chat", "right", MessageSquare], ["Chat + Board", null, Columns2], ["Board", "left", PenLine]] as const).map(([label, hide, Icon]) => (
+            <button
+              key={label} type="button" aria-pressed={collapsed === hide}
+              onClick={() => { voice.cancelListening(); voice.stopSpeaking(); setCollapsed(hide) }}
+              className="flex min-h-[34px] items-center gap-1.5 !px-4"
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />{label}
+            </button>
+          ))}
         </div>
       ) : (
-        <div role="tablist" aria-label="Coach mode" className="inline-flex shrink-0 rounded-full bg-[var(--color-surface-muted)] p-0.5">
+        <div role="tablist" aria-label="Coach mode" className="inline-flex shrink-0 rounded-full border border-[var(--color-control-border)] bg-white p-[3px]">
           {([["chat", "Chat", MessageSquare], ["board", "Whiteboard", PenLine]] as const).map(([id, label, Icon]) => (
             <button
               key={id}
@@ -253,7 +249,7 @@ export default function AiCoach() {
                   setMode(id)
                 }
               }}
-              className={cn("flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", mode === id ? "bg-white text-[var(--color-teal-dark)] shadow-sm" : "text-[var(--color-ink-soft)] hover:text-[var(--color-ink)]")}
+              className={cn("flex min-h-9 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", mode === id ? "bg-[var(--color-plum)] font-[650] text-[var(--color-on-plum)]" : "text-[var(--color-ink-soft)] hover:text-[var(--color-ink)]")}
             >
               <Icon className="h-4 w-4" aria-hidden="true" />{label}
             </button>
@@ -336,7 +332,7 @@ export default function AiCoach() {
   const ctl = dense && !split            // the compact control sizes belong to the old full-screen board mode; the split view keeps the roomy composer
   const composer = (
     <form
-      className={cn("flex shrink-0 flex-wrap items-end gap-2 border-t border-[var(--color-border)] pb-[max(0.75rem,env(safe-area-inset-bottom))]", ctl ? "p-1.5 px-3 bg-white" : "p-3")}
+      className={cn("flex shrink-0 flex-wrap items-end gap-2 border-t border-[var(--color-border)] bg-white pb-[max(0.75rem,env(safe-area-inset-bottom))]", ctl ? "p-1.5 px-3" : "p-3 sm:px-5 sm:py-3.5")}
       onSubmit={(e) => {
         e.preventDefault()
         void handleSend()
@@ -356,8 +352,8 @@ export default function AiCoach() {
         maxLength={4000}
         placeholder={!split && mode === "board" ? "Ask SocratiQ about the board, or tell it what to write…" : split ? "Ask SocratiQ, or about what's on the board…" : "Start your chat here…"}
         className={cn(
-          "min-w-0 resize-none rounded-[1.25rem] border max-sm:basis-full sm:flex-1 py-2 leading-5 border-[var(--color-control-border)] bg-white px-3.5 text-sm placeholder:text-[var(--color-ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-teal-dark)] disabled:opacity-60",
-          ctl ? "min-h-9 text-xs sm:text-sm" : "min-h-11"
+          "min-w-0 resize-none rounded-[26px] border max-sm:basis-full sm:flex-1 py-2.5 leading-5 border-[var(--color-control-border)] bg-white px-5 text-[15px] placeholder:text-[var(--color-ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-teal-dark)] disabled:opacity-60",
+          ctl ? "min-h-9 text-xs sm:text-sm" : "min-h-[52px]"
         )}
         aria-label="Message SocratiQ AI"
       />
@@ -377,7 +373,7 @@ export default function AiCoach() {
             type="button"
             size="md"
             variant="secondary"
-            className={cn("rounded-full p-0 shrink-0", ctl ? "h-9 w-9" : "h-11 w-11")}
+            className={cn("rounded-full !border !border-[var(--color-control-border)] !bg-white p-0 shrink-0", ctl ? "h-9 w-9" : "h-[50px] w-[50px]")}
             aria-label={listening ? "Stop recording and send" : "Speak your message"}
             aria-pressed={listening}
             disabled={closed || (!listening && !!thinking)}
@@ -392,7 +388,7 @@ export default function AiCoach() {
           type="button"
           size="md"
           variant="secondary"
-          className={cn("rounded-full p-0 shrink-0", ctl ? "h-9 w-9" : "h-11 w-11")}
+          className={cn("rounded-full !border !border-[var(--color-control-border)] !bg-white p-0 shrink-0", ctl ? "h-9 w-9" : "h-[50px] w-[50px]")}
           aria-label={readAloud ? "Turn off reading replies aloud" : "Read replies aloud"}
           aria-pressed={readAloud}
           onClick={() => { if (readAloud) voice.stopSpeaking(); setReadAloud((v) => !v) }}
@@ -401,11 +397,11 @@ export default function AiCoach() {
         </Button>
       )}
       {thinking ? (
-        <Button type="button" size="md" variant="secondary" className={cn("rounded-full p-0 shrink-0 max-sm:ml-auto", ctl ? "h-9 w-9" : "h-11 w-11")} aria-label="Cancel and edit message" onClick={() => abort.current?.abort()}>
+        <Button type="button" size="md" variant="secondary" className={cn("rounded-full p-0 shrink-0 max-sm:ml-auto", ctl ? "h-9 w-9" : "h-[50px] w-[50px]")} aria-label="Cancel and edit message" onClick={() => abort.current?.abort()}>
           <Square className="h-4 w-4" />
         </Button>
       ) : (
-        <Button type="submit" size="md" className={cn("rounded-full p-0 shrink-0 max-sm:ml-auto", ctl ? "h-9 w-9" : "h-11 w-11")} aria-label="Send message" disabled={closed}>
+        <Button type="submit" size="md" className={cn("rounded-full p-0 shrink-0 max-sm:ml-auto", ctl ? "h-9 w-9" : "h-[50px] w-[50px]")} aria-label="Send message" disabled={closed}>
           <Send className="h-4 w-4" />
         </Button>
       )}
@@ -459,8 +455,9 @@ function Bubble({ message, onViewBoard, topic }: { message: Local; onViewBoard: 
     <div className={cn("flex", isStudent ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "min-w-0 max-w-[88%] rounded-[var(--radius-lg)] px-4 py-2.5 text-sm sm:max-w-[75%]",
-          isStudent ? "bg-[var(--color-teal-light)] text-[var(--color-ink)]" : "bg-[var(--color-surface-muted)] text-[var(--color-ink)]"
+          "min-w-0 max-w-[88%] text-[15px] leading-relaxed text-[var(--color-ink)]",
+          // approved design: the student's words are a peach pill on the right; the coach answers in a white bordered card
+          isStudent ? "rounded-[22px] bg-[var(--color-plum-light)] px-5 py-2.5 sm:max-w-[80%]" : "rounded-2xl border border-[var(--color-border)] bg-white px-5 py-4 sm:max-w-[92%]"
         )}
       >
         <RichText
@@ -469,7 +466,7 @@ function Bubble({ message, onViewBoard, topic }: { message: Local; onViewBoard: 
           renderCodeBlock={final ? (code, lang, i) => <RunnableCodeBlock code={code} lang={lang} blockKey={`${message.id}:${i}`} /> : undefined}
         />
         {!isStudent && message.boardCount ? (
-          <button type="button" onClick={onViewBoard} className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-teal-dark)]/30 bg-white px-2.5 py-1 text-xs font-medium text-[var(--color-teal-dark)] hover:bg-[var(--color-teal-light)]">
+          <button type="button" onClick={onViewBoard} className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border-strong)] bg-white px-3 py-1.5 text-[13px] font-medium text-[var(--color-teal-dark)] hover:bg-[var(--color-teal-light)]">
             <PenLine className="h-3.5 w-3.5" aria-hidden="true" />Wrote {message.boardCount} {message.boardCount === 1 ? "item" : "items"} on the board · View board
           </button>
         ) : null}
@@ -490,5 +487,18 @@ function Bubble({ message, onViewBoard, topic }: { message: Local; onViewBoard: 
         {final && message.content.trim() && <SaveToNotesButton messageId={message.id} content={message.content} topic={topic} />}
       </div>
     </div>
+  )
+}
+
+/** "Due soon · Nov 24" pill from the approved Coach header. */
+function CoachDue({ dueDate, done }: { dueDate?: string | null; done: boolean }) {
+  const d = dueInfo(dueDate, done)
+  if (d.state === "none") return null
+  const date = dueDate ? new Date(dueDate).toLocaleDateString(undefined, { month: "short", day: "2-digit" }) : ""
+  const text = d.state === "soon" ? `Due soon · ${date}` : d.state === "overdue" ? d.label : d.state === "done" ? `Handed in · due ${date}` : `Due ${date}`
+  return (
+    <span title={d.full ?? undefined} className={cn("ds-pill", d.state === "overdue" ? "ds-pill-bad" : d.state === "soon" ? "ds-pill-or" : "ds-pill-neu")}>
+      <Clock className="h-3.5 w-3.5" aria-hidden="true" />{text}
+    </span>
   )
 }

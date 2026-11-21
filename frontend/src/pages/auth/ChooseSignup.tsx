@@ -6,7 +6,7 @@ import { ButtonLink } from "@/components/ui/Button"
 export default function ChooseSignup() {
   return (
     <AuthLayout>
-      <h1 className="text-center text-lg font-semibold text-[var(--color-ink)]">Choose what to sign up as</h1>
+      <h1 className="text-center font-serif text-[28px] font-bold leading-tight text-[var(--color-ink)]">Choose what to sign up as</h1>
       <div className="mt-6 space-y-3">
         <ButtonLink to="/signup/student" variant="outline" size="lg" className="w-full">
           <GraduationCap className="h-4 w-4" aria-hidden="true" /> Sign up as student

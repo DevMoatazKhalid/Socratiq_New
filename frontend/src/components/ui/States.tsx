@@ -16,7 +16,7 @@ export function EmptyState({
   icon?: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-muted)] px-6 py-14 text-center">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border-strong)] bg-[#fffaf6] px-6 py-14 text-center">
       {icon && <div className="mb-3 text-[var(--color-ink-muted)]">{icon}</div>}
       <h3 className="text-base font-semibold text-[var(--color-ink)]">{title}</h3>
       <p className="mt-1 max-w-sm text-sm text-[var(--color-ink-soft)]">{description}</p>
@@ -31,7 +31,7 @@ export function EmptyState({
 
 export function ErrorState({ title, description, onRetry }: { title: string; description: string; onRetry?: () => void }) {
   return (
-    <div role="alert" className="flex flex-col items-center justify-center rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white px-6 py-12 text-center shadow-[var(--shadow-panel)]">
+    <div role="alert" className="flex flex-col items-center justify-center rounded-2xl border border-[var(--color-border)] bg-white px-6 py-12 text-center shadow-[var(--shadow-panel)]">
       <span className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--color-danger-light)] text-[var(--color-danger-ink)]">
         <AlertCircle className="h-5 w-5" aria-hidden="true" />
       </span>

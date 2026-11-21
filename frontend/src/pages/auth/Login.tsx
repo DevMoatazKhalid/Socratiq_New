@@ -45,7 +45,7 @@ export default function Login() {
 
   return (
     <AuthLayout>
-      <h1 className="text-center text-lg font-semibold text-[var(--color-ink)]">Log in</h1>
+      <h1 className="text-center font-serif text-[28px] font-bold leading-tight text-[var(--color-ink)]">Log in</h1>
       <form className="mt-6 space-y-4" onSubmit={handleSubmit} noValidate>
         <Field id="login-email" label="Email">
           <Input {...fieldProps("login-email")} type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />

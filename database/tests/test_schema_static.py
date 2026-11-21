@@ -12,7 +12,7 @@ def test_migration_order():
         "000_extensions.sql","001_rag_pgvector_schema.sql","002_core_university_schema.sql",
         "003_learning_workflow_schema.sql","004_ai_coach_schema.sql","005_verification_schema.sql",
         "006_learning_evidence_schema.sql","007_rls.sql","008_indexes_triggers.sql",
-        "009_tenant_integrity.sql","010_domain_lifecycle.sql","011_file_pipeline.sql","012_indexes.sql","013_rls.sql","014_grading.sql","015_whiteboard.sql","016_whiteboard_scene.sql","017_teaching_personas.sql","018_student_notes.sql"]
+        "009_tenant_integrity.sql","010_domain_lifecycle.sql","011_file_pipeline.sql","012_indexes.sql","013_rls.sql","014_grading.sql","015_whiteboard.sql","016_whiteboard_scene.sql","017_teaching_personas.sql","018_student_notes.sql","019_notes_board.sql"]
 
 def test_rag_contract():
     s = read("001_rag_pgvector_schema.sql")
@@ -85,3 +85,21 @@ def test_student_notes_migration_is_additive_owned_and_read_only_through_the_dat
         assert other not in s                                                                    # nothing existing is touched
     down = (MIG / "down" / "018_student_notes.down.sql").read_text(encoding="utf-8")
     assert "DROP TABLE IF EXISTS public.student_notes" in down and "students" not in down.replace("student_notes", "")
+
+
+def test_notes_board_migration_is_additive_owned_and_read_only_through_the_data_api():
+    raw = read("019_notes_board.sql")
+    s = "\n".join(l for l in raw.splitlines() if not l.strip().startswith("--"))
+    for col in ("course_id", "assignment_id", "importance", "pinned"):                           # new columns only, all nullable or defaulted
+        assert f"ALTER TABLE public.student_notes ADD COLUMN IF NOT EXISTS {col}" in s
+    assert "pinned        boolean NOT NULL DEFAULT false" in s
+    assert "ON DELETE SET NULL" in s                                                              # removing a course/assignment never deletes notes
+    assert s.count("CREATE TABLE IF NOT EXISTS") == 2
+    assert "REFERENCES public.students (student_id, university_id) ON DELETE CASCADE" in s        # tenant integrity like 009/018
+    for t in ("student_note_groups", "student_note_group_members"):
+        assert f"ALTER TABLE public.{t} ENABLE ROW LEVEL SECURITY" in s and f"GRANT SELECT ON public.{t} TO authenticated" in s
+    assert not re.search(r"GRANT\s+(ALL|INSERT|UPDATE|DELETE)", s)                               # Data API stays read-only (013)
+    for other in ("DROP TABLE", "TRUNCATE", "DELETE FROM", "UPDATE public.", "DROP COLUMN", "ALTER TABLE public.students", "DROP TRIGGER IF EXISTS student_notes_set_updated_at"):
+        assert other not in s                                                                    # nothing existing is removed or rewritten
+    down = (MIG / "down" / "019_notes_board.down.sql").read_text(encoding="utf-8")
+    assert "DROP TABLE IF EXISTS public.student_note_groups" in down and "DROP TABLE IF EXISTS public.student_notes;" not in down

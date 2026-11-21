@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from "react"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { AppShell } from "@/components/layout/AppShell"
-import { Card, CardContent } from "@/components/ui/Card"
-import { Button, ButtonLink } from "@/components/ui/Button"
-import { Badge } from "@/components/ui/Badge"
-import { ErrorState } from "@/components/ui/States"
+import { cn } from "@/lib/utils"
 import { CheckCircle2 } from "lucide-react"
 import { useAnswerVerification, useStartVerification, useStudentAssignment, useStudentCourse, type VerificationState } from "@/lib/queries"
 import { ApiError } from "@/lib/api"
@@ -75,36 +72,42 @@ export default function Verification() {
       ]}
     >
       {blocked ? (
-        <ErrorState title="Not ready yet" description={blocked} />
+        <section className="mx-auto max-w-[770px] rounded-2xl border border-[var(--color-border)] bg-[#f6f4ea] p-6" role="status">
+          <div className="rounded-[12px] border border-[var(--color-border)] bg-white px-6 py-5">
+            <h1 className="text-lg font-semibold text-[var(--color-ink)]">Not ready yet</h1>
+            <p className="mt-1 text-[15px] text-[var(--color-ink-soft)]">{blocked}</p>
+            <Link to={back} className="ds-btn ds-btn-sm mt-4">Back to assignment</Link>
+          </div>
+        </section>
       ) : (
-        <Card className="mx-auto max-w-2xl">
-          <CardContent>
+        <section className={cn("mx-auto max-w-[770px] rounded-2xl border border-[var(--color-border)] px-8 py-8", done ? "bg-[#f6f4ea]" : "bg-white shadow-[0_1px_2px_rgb(20_17_2/0.05)]")}>
+          <div>
             {!done ? (
               <>
-                <p className="text-xs font-medium text-[var(--color-teal-dark)]">Show what you understand</p>
-                <h1 className="mt-1 text-lg font-semibold text-[var(--color-ink)]">{assignment.data?.title}</h1>
-                <p className="mt-1 text-sm text-[var(--color-ink-soft)]">
+                <p className="text-[13px] font-semibold text-[var(--color-teal-dark)]">Show what you understand</p>
+                <h1 className="mt-1 text-[22px] font-bold text-[var(--color-ink)]">{assignment.data?.title}</h1>
+                <p className="mt-2 text-[15px] leading-relaxed text-[var(--color-ink-soft)]">
                   A short conversation about the solution you submitted — this isn't a re-test, it's a chance to show the reasoning behind your work.
                 </p>
 
                 <div className="mt-5 flex gap-2">
                   {(state?.steps ?? [{ type: "EXPLAIN" }, { type: "MODIFY" }, { type: "TRANSFER" }]).map((s, i) => (
-                    <span key={s.type} className={`h-1.5 flex-1 rounded-full ${i <= stepIndex ? "bg-[var(--color-teal)]" : "bg-[var(--color-border)]"}`} />
+                    <span key={s.type} className={`h-[6px] flex-1 rounded-full ${i <= stepIndex ? "bg-[var(--color-teal)]" : "bg-[#e2e3cf]"}`} />
                   ))}
                 </div>
 
                 {feedback && (
-                  <p role="status" className="mt-4 rounded-[var(--radius-md)] border border-[var(--color-teal-light)] bg-[var(--color-teal-light)]/40 px-3 py-2 text-sm text-[var(--color-ink-soft)]">
-                    <span className="font-medium text-[var(--color-ink)]">On your last answer: </span>
+                  <p role="status" className="mt-4 rounded-[12px] border border-[var(--color-border)] bg-[var(--color-teal-light)] px-4 py-2.5 text-[15px] text-[var(--color-ink)]">
+                    <span className="font-bold">On your last answer: </span>
                     {feedback}
                   </p>
                 )}
 
                 {current ? (
                   <>
-                    <div className="mt-5 rounded-[var(--radius-md)] bg-[var(--color-surface-muted)] p-4">
-                      <Badge tone="teal">{LABEL[current.type] ?? current.type}</Badge>
-                      <p id="verification-question" className="mt-2 text-[var(--color-ink)]">{current.question}</p>
+                    <div className="mt-6 rounded-[12px] bg-[var(--color-surface-muted)] px-5 py-4">
+                      <span className="ds-pill ds-pill-info">{LABEL[current.type] ?? current.type}</span>
+                      <p id="verification-question" className="mt-3 text-base text-[var(--color-ink)]">{current.question}</p>
                     </div>
                     <textarea dir="auto"
                       value={answer}
@@ -114,7 +117,7 @@ export default function Verification() {
                       aria-label="Your response"
                       aria-describedby="verification-question"
                       placeholder="Write your response…"
-                      className="mt-4 w-full rounded-[var(--radius-md)] border border-[var(--color-control-border)] p-3 text-sm placeholder:text-[var(--color-ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-teal-dark)]"
+                      className="mt-5 w-full rounded-[12px] border border-[var(--color-control-border)] px-4 py-3 text-[15px] placeholder:text-[var(--color-ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-teal-dark)]"
                     />
                   </>
                 ) : (
@@ -124,36 +127,34 @@ export default function Verification() {
                 )}
 
                 {error && (
-                  <p role="alert" className="mt-3 text-sm text-[var(--color-danger-ink)]">
+                  <p role="alert" className="mt-3 text-[15px] text-[var(--color-danger-ink)]">
                     {error}
                   </p>
                 )}
 
                 <div className="mt-4 flex justify-between">
-                  <ButtonLink to={back} variant="outline">Go back</ButtonLink>
+                  <Link to={back} className="ds-btn">Go back</Link>
                   {current ? (
-                    <Button onClick={submit} disabled={!answer.trim() || answerM.isPending}>
+                    <button type="button" className="ds-btn ds-btn-pri" onClick={submit} disabled={!answer.trim() || answerM.isPending}>
                       {answerM.isPending ? "Sending…" : stepIndex < 2 ? "Continue" : "Finish verification"}
-                    </Button>
+                    </button>
                   ) : (
-                    <Button onClick={begin} disabled={start.isPending}>
-                      Retry
-                    </Button>
+                    <button type="button" className="ds-btn ds-btn-pri" onClick={begin} disabled={start.isPending}>Retry</button>
                   )}
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center py-8 text-center">
-                <CheckCircle2 className="h-10 w-10 text-[var(--color-teal-dark)]" />
-                <h2 className="mt-3 text-lg font-semibold text-[var(--color-ink)]">Verification complete</h2>
-                <p className="mt-1 max-w-sm text-sm text-[var(--color-ink-soft)]">
+              <div className="flex flex-col items-center py-6 text-center" role="status">
+                <CheckCircle2 className="h-10 w-10 text-[var(--color-teal-dark)]" strokeWidth={1.8} aria-hidden="true" />
+                <h1 className="mt-3 text-[22px] font-bold text-[var(--color-ink)]">Verification complete</h1>
+                <p className="mt-1 max-w-[400px] text-[15px] text-[var(--color-ink-soft)]">
                   Your reasoning has been added to this assignment's learning evidence. Your instructor will see it alongside your submission.
                 </p>
-                <ButtonLink to={back} className="mt-5">Back to assignment</ButtonLink>
+                <Link to={back} className="ds-btn ds-btn-pri mt-5">Back to assignment</Link>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
     </AppShell>
   )

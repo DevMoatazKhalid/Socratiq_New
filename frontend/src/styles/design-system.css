@@ -1,0 +1,134 @@
+/* SocratiQ approved UI/UX: component layer.
+ *
+ * These classes reproduce the approved design files (teacher "E-*" screens, student flow redesign, notes board v2) exactly: sizes, radii,
+ * weights and colours are copied from the reference CSS and expressed through the existing @theme tokens in index.css. Screens compose
+ * these classes instead of re-deriving the look per page, so the product keeps one design language.
+ * Loaded inside @layer components so Tailwind utilities can still adjust a single instance.
+ */
+@layer components {
+  .ds-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 16px; box-shadow: 0 1px 2px rgb(20 17 2 / 0.05); }
+  .ds-card-pad { padding: 20px; }
+  .ds-h1 { font-family: var(--font-serif); font-size: 34px; font-weight: 700; line-height: 1.1; margin: 0; color: var(--color-ink); letter-spacing: -0.005em; }
+  .ds-h2 { font-size: 15px; font-weight: 650; margin: 0; color: var(--color-ink); }
+  .ds-sub { font-size: 12px; color: var(--color-ink-muted); margin-top: 2px; }
+  .ds-soft { color: var(--color-ink-muted); }
+  .ds-note { font-size: 11px; color: var(--color-ink-muted); }
+  .ds-num { font-variant-numeric: tabular-nums; }
+  .ds-kicker { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink-muted); }
+
+  /* pills (status / counts) */
+  .ds-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; line-height: 1.35; }
+  .ds-pill-ok { background: var(--color-success-light); color: var(--color-success-ink); }
+  .ds-pill-warn { background: var(--color-warning-light); color: var(--color-warning-ink); }
+  .ds-pill-bad { background: var(--color-danger-light); color: var(--color-danger-ink); }
+  .ds-pill-neu { background: var(--color-slate-light); color: var(--color-ink-muted); }
+  .ds-pill-or { background: var(--color-plum-light); color: var(--color-warning-ink); }
+  .ds-pill-info { background: var(--color-teal-light); color: var(--color-teal-dark); }
+  .ds-pill-count { padding: 1px 8px; }
+
+  /* buttons */
+  .ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 12px; padding: 9px 14px; font-weight: 600; font-size: 13px;
+    border: 1px solid var(--color-control-border); background: var(--color-surface); color: var(--color-ink); white-space: nowrap; cursor: pointer;
+    transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease; }
+  .ds-btn:hover:not(:disabled) { background: var(--color-surface-muted); }
+  .ds-btn:disabled, .ds-btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+  .ds-btn-pri { background: var(--color-plum); border-color: var(--color-plum); color: var(--color-on-plum); }
+  .ds-btn-pri:hover:not(:disabled) { background: #ec8c00; border-color: #ec8c00; }
+  .ds-btn-soft { background: var(--color-plum-light); border-color: #f3c98c; color: var(--color-ink); }
+  .ds-btn-soft:hover:not(:disabled) { background: #fde0b6; }
+  .ds-btn-ghost { border-color: transparent; background: transparent; color: var(--color-ink-muted); }
+  .ds-btn-ghost:hover:not(:disabled) { background: var(--color-surface-muted); color: var(--color-ink); }
+  .ds-btn-danger { color: var(--color-danger-ink); border-color: #d7a9a4; }
+  .ds-btn-sm { padding: 6px 11px; font-size: 12px; border-radius: 10px; }
+  .ds-btn-icon { padding: 0; width: 40px; height: 40px; border-radius: 999px; }
+
+  /* select-like controls, search fields, chips */
+  .ds-sel { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--color-control-border); background: var(--color-surface); border-radius: 12px;
+    padding: 8px 12px; font-size: 13px; font-weight: 500; white-space: nowrap; color: var(--color-ink); }
+  select.ds-sel { appearance: none; padding-right: 30px; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23141102' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; }
+  .ds-sel-sm { padding: 5px 10px; font-size: 12px; }
+  select.ds-sel-sm { padding-right: 26px; }
+  .ds-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--color-control-border); background: var(--color-surface); border-radius: 12px;
+    padding: 8px 12px; font-size: 13px; color: var(--color-ink-muted); min-width: 0; }
+  .ds-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--color-ink); font-size: 13px; }
+  .ds-search input::placeholder { color: var(--color-ink-muted); }
+  .ds-search:focus-within { outline: 2px solid var(--color-teal-dark); outline-offset: 2px; }
+  .ds-search-pill { border-radius: 999px; background: #fff8f3; padding: 9px 16px; }
+  .ds-input { width: 100%; border: 1px solid var(--color-control-border); background: var(--color-surface); border-radius: 12px; padding: 10px 12px; font-size: 14px; color: var(--color-ink); }
+  .ds-input::placeholder { color: var(--color-ink-muted); }
+  .ds-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--color-ink); }
+  .ds-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border-strong); background: var(--color-surface); border-radius: 999px;
+    padding: 6px 12px; font-size: 12px; font-weight: 550; color: var(--color-ink-muted); white-space: nowrap; cursor: pointer; }
+  .ds-chip:hover { color: var(--color-ink); }
+  .ds-chip[aria-pressed="true"], .ds-chip.is-on { background: var(--color-plum-light); border-color: var(--color-plum); color: var(--color-ink); }
+
+  /* segmented toggle (All · Pinned, Board · List, Group by) */
+  .ds-seg { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--color-control-border); border-radius: 999px; background: var(--color-surface); }
+  .ds-seg > button, .ds-seg > a { border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 550; color: var(--color-ink); white-space: nowrap; }
+  .ds-seg > [aria-pressed="true"], .ds-seg > [aria-current="page"], .ds-seg > [aria-selected="true"] { background: var(--color-plum); color: var(--color-on-plum); font-weight: 650; }
+
+  /* tabs */
+  .ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border); overflow-x: auto; scrollbar-width: none; }
+  .ds-tab { white-space: nowrap; padding: 10px 14px; font-weight: 500; color: var(--color-ink-muted); font-size: 13px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .ds-tab:hover { color: var(--color-ink); }
+  .ds-tab[aria-selected="true"], .ds-tab[aria-current="page"] { color: var(--color-ink); font-weight: 650; border-color: var(--color-plum); }
+
+  /* tables */
+  .ds-table { border-collapse: collapse; width: 100%; }
+  .ds-table th { text-align: left; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-ink-muted); font-weight: 600; padding: 10px 12px;
+    border-bottom: 1px solid var(--color-border); background: var(--color-surface); white-space: nowrap; }
+  .ds-table td { padding: 11px 12px; border-bottom: 1px solid #eeeee0; font-size: 13px; vertical-align: middle; }
+  .ds-table tr:last-child td { border-bottom: 0; }
+  .ds-table tbody tr[data-href]:hover td { background: #fffaf6; cursor: pointer; }
+  .ds-table-wrap { overflow-x: auto; position: relative; }   /* positioned so sr-only cells cannot escape the scroller and widen the page */
+
+  /* avatars, bars, dots */
+  .ds-av { width: 32px; height: 32px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; flex: none;
+    background: var(--color-plum-light); color: var(--color-ink); }
+  .ds-bar { flex: 1; min-width: 40px; height: 8px; border-radius: 99px; background: var(--color-slate-light); overflow: hidden; }
+  .ds-bar > i { display: block; height: 100%; border-radius: 99px; }
+  .ds-dot { width: 8px; height: 8px; border-radius: 99px; display: inline-block; flex: none; }
+
+  /* KPI tile */
+  .ds-kpi-value { font-size: 34px; font-weight: 700; margin: 8px 0 2px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+
+  /* link with arrow (View all ->) */
+  .ds-link { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-teal-dark); font-weight: 650; }
+  .ds-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* 4-step learning progress (Attempt > Coach > Submit > Verify) */
+  .ds-steps { display: inline-flex; align-items: center; }
+  .ds-step { width: 20px; height: 20px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
+    border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-ink-muted); flex: none; }
+  .ds-step.is-done { background: var(--color-success); border-color: var(--color-success); color: #fff; }
+  .ds-step.is-current { background: var(--color-plum); border-color: var(--color-plum); color: var(--color-ink); }
+  .ds-step-line { width: 16px; height: 1px; background: var(--color-border-strong); }
+  .ds-step-line.is-done { background: var(--color-success); }
+
+  /* sticky notes (Notes board v2) */
+  .ds-sticky { border-radius: 6px; padding: 14px; box-shadow: 0 2px 5px rgb(60 40 10 / 0.18); min-height: 124px; display: flex; flex-direction: column; gap: 6px;
+    text-align: left; transition: transform 150ms ease, box-shadow 150ms ease; }
+  .ds-sticky:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgb(60 40 10 / 0.22); }
+  .ds-sticky-high { background: #fbd3c1; }
+  .ds-sticky-medium { background: #fdeab8; }
+  .ds-sticky-low { background: #dcead9; }
+  .ds-sticky-none { background: #f6f1e6; }
+  .ds-imp { border: 1px solid; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; background: none; }
+  .ds-imp-high { background: #fde3d6; border-color: #e8622a; color: #9a3412; }
+  .ds-imp-medium { background: #fdecc8; border-color: #f59300; color: #7a4a00; }
+  .ds-imp-low { background: #e3efe4; border-color: #6b9a7a; color: #2f5d3c; }
+  .ds-group { border: 1px solid #c9c28a; background: #f2efdc; border-radius: 18px; padding: 0 18px 18px; margin-top: 26px; }
+  .ds-group.is-loose { background: var(--color-surface); }
+  .ds-group-head { display: flex; justify-content: space-between; align-items: center; margin: -12px 0 14px; gap: 8px; flex-wrap: wrap; }
+  .ds-group-tag { background: #a3a060; border-radius: 8px; padding: 3px 12px; font-weight: 700; font-size: 12px; color: var(--color-ink); }
+  .ds-group-tag.is-loose { background: #4a4436; color: #fff; }
+  .ds-group-meta { font-size: 12px; font-weight: 600; color: #4a4436; background: var(--color-surface); border-radius: 999px; padding: 2px 10px; display: inline-flex; gap: 6px; align-items: center; }
+  .ds-sticky-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+}
+
+/* Dense tables keep their full layout on small screens by scrolling inside the card; the page itself never scrolls sideways. */
+@media (max-width: 1023px) {
+  .ds-h1 { font-size: 28px; }
+}

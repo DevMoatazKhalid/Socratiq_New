@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { api, apiStream, upload } from "./api"
+import { api, ApiError, apiStream, upload } from "./api"
 import type { Board, BoardReport } from "./whiteboard"
 import { useAuth } from "./auth"
 import type {
-  ActivityEntry, AttentionItem, Assignment, Capabilities, ChatMessage, Course, DashboardOverview, EvidenceEntry, FileInfo, LearningSignal, Material, ReviewQueueRow,
+  ActivityEntry, AttentionItem, Assignment, AssignmentStatus, Capabilities, ChatMessage, Course, DashboardOverview, EvidenceEntry, FileInfo, LearningSignal, Material, ReviewQueueRow,
   RiskAssessment, Role, StudentDetailInfo, StudentRow, SubmissionRow,
 } from "@/types"
 
@@ -40,6 +40,63 @@ export const studentKeys = { all: ["student"] as const }
 
 export function useStudentHome() {
   return useQuery({ queryKey: ["student", "home"], queryFn: () => api<{ user: { id: string; name: string }; courses: Course[]; assignments: Assignment[] }>("/student/home") })
+}
+
+// ------------------------------------------------------------------ progress & insights (additive endpoints; see backend/app/insights.py)
+/** One week of a trend line. Each value is null when there was nothing to measure that week (never a made-up zero). */
+export interface TrendPoint { weekStart: string; averageGrade: number | null; completion: number | null; verificationSuccess: number | null }
+
+export interface StudentOverview {
+  kpis: {
+    courses: number; assignments: number; submitted: number; graded: number; awaitingGrade: number; averageGrade: number | null
+    verificationsPassed: number; verificationsTotal: number; verificationsReady: number; dueThisWeek: number
+    next: { assignmentId: string; courseId: string; title: string; dueAt: string } | null
+  }
+  /** Percentage-point change against 30 days earlier; null when there is no earlier value to compare with. */
+  deltas: { completion: number | null; averageGrade: number | null }
+  trend: TrendPoint[]
+  courses: { courseId: string; done: number; total: number; averageGrade: number | null; verificationPassed: number; verificationTotal: number
+    nextDue: { assignmentId: string; title: string; dueAt: string } | null }[]
+  assignments: { assignmentId: string; courseId: string; status: AssignmentStatus; coachTurns: number; submittedAt: string | null
+    grade: { percentage: number; gradedAt: string; feedback: string | null } | null
+    verification: { passed: number; total: number; status: string } | null }[]
+}
+
+export interface TeacherInsights {
+  trend: TrendPoint[]
+  deltas: { students: number | null; completion: number | null; averageGrade: number | null; verificationSuccess: number | null }
+  grades: { graded: number; awaiting: number; highest: number | null; lowest: number | null; distribution: { bucket: string; count: number }[] }
+  assignments: { id: string; title: string; lifecycle: "DRAFT" | "PUBLISHED" | "ARCHIVED"; dueAt: string | null; maxScore: number | null; students: number; submitted: number
+    graded: number; averageGrade: number | null; verificationRate: number | null }[]
+  /** Per enrolled student. Averages use graded work only; ungraded work is never counted as 0. */
+  students: { id: string; averageGrade: number | null; graded: number; submitted: number; awaiting: number; verificationRate: number | null; recentGrades: number[] }[]
+  /** Each student's latest submission per assignment in this course. */
+  submissions: { studentId: string; studentName: string; assignmentId: string; assignmentTitle: string; attemptNumber: number; submittedAt: string
+    grade: { percentage: number; gradedAt: string } | null; verification: { status: string; outcome: string | null; passed: number; total: number } | null }[]
+  signals: { byType: { signal: string; label: string; students: number }[]; byLevel: { none: number; one: number; two: number; threePlus: number } }
+  coachWeekly: { weekStart: string; turns: number }[]
+  /** Verified mastery per concept across the class (verification results only). */
+  concepts: { name: string; mastery: number | null; level: "Strong" | "Moderate" | "Weak" | null; assignments: number }[]
+  /** Class activity in the selected period, newest first. */
+  activity: (ActivityEntry & { studentId?: string; studentName?: string })[]
+}
+
+/** A server that predates these endpoints answers 404: the pages then show their "not enough data yet" states instead of an error. */
+async function optional<T>(path: string): Promise<T | null> {
+  try {
+    return await api<T>(path)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null
+    throw e
+  }
+}
+
+export function useStudentOverview(weeks = 8) {
+  return useQuery({ queryKey: ["student", "overview", weeks], queryFn: () => optional<StudentOverview>(`/student/overview?weeks=${weeks}`) })
+}
+
+export function useTeacherInsights(courseId?: string, weeks = 8) {
+  return useQuery({ queryKey: ["teacher", "insights", courseId, weeks], enabled: !!courseId, queryFn: () => optional<TeacherInsights>(`/teacher/courses/${enc(courseId!)}/insights?weeks=${weeks}`) })
 }
 
 export function useStudentCourse(courseId?: string) {

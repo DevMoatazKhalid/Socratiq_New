@@ -60,7 +60,10 @@ export function AppShell({
       <div className={cn("flex min-w-0 flex-1 flex-col", fitViewport && "min-h-0")}>
         <PageHeader crumbs={crumbs} search={search} onMenuClick={() => setOpen(true)}
           right={role === "student" ? <>{headerRight}<NotesButton /></> : headerRight} />
-        <main id="main" className={cn("flex-1", fitViewport && "flex min-h-0 flex-col overflow-hidden", mainClassName ?? "p-4 lg:p-8")}>{children}</main>
+        <main id="main" className={cn("flex-1", fitViewport && "flex min-h-0 flex-col overflow-hidden", mainClassName ?? "p-4 sm:p-6 lg:px-8 lg:pb-10 lg:pt-7")}>
+          {/* Approved layout: content keeps the reference width (1192px) and aligns with the header; workspace pages manage their own size. */}
+          {fitViewport || mainClassName ? children : <div className="max-w-[1192px]">{children}</div>}
+        </main>
       </div>
     </div>
   )

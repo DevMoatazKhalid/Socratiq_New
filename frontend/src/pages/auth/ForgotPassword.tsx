@@ -38,7 +38,7 @@ export default function ForgotPassword() {
       <AuthLayout>
         <div className="flex flex-col items-center py-2 text-center">
           <MailCheck className="h-9 w-9 text-[var(--color-teal-dark)]" aria-hidden="true" />
-          <h1 className="mt-3 text-lg font-semibold text-[var(--color-ink)]">Check your email</h1>
+          <h1 className="mt-3 font-serif text-[26px] font-bold leading-tight text-[var(--color-ink)]">Check your email</h1>
           <p className="mt-1 text-sm text-[var(--color-ink-soft)]">
             If an account exists for <span className="font-medium text-[var(--color-ink)]">{email}</span>, a reset
             link is on its way.
@@ -51,7 +51,7 @@ export default function ForgotPassword() {
 
   return (
     <AuthLayout>
-      <h1 className="text-center text-lg font-semibold text-[var(--color-ink)]">Reset your password</h1>
+      <h1 className="text-center font-serif text-[28px] font-bold leading-tight text-[var(--color-ink)]">Reset your password</h1>
       <p className="mt-2 text-center text-sm text-[var(--color-ink-soft)]">
         Enter your email and we'll send you a link to get back in.
       </p>

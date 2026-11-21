@@ -101,7 +101,7 @@ export default function NewAssignment() {
         { label: "New assignment" },
       ]}
     >
-      <h1 className="text-xl font-semibold text-[var(--color-ink)]">New assignment</h1>
+      <h1 className="ds-h1">New assignment</h1>
       <p className="mt-1 text-sm text-[var(--color-ink-soft)]">{course?.name}</p>
 
       <Card className="mt-6 max-w-xl">

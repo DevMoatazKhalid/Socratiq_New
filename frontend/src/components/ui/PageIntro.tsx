@@ -14,9 +14,9 @@ export function PageIntro({ eyebrow, title, subtitle, meta, actions, leading }: 
       <div className="flex min-w-0 items-start gap-4">
         {leading}
         <div className="min-w-0">
-          {eyebrow && <p className="text-xs font-medium text-[var(--color-teal-dark)]">{eyebrow}</p>}
-          <h1 className="text-balance text-xl font-semibold text-[var(--color-ink)] [overflow-wrap:anywhere] sm:text-2xl">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-[var(--color-ink-muted)] [overflow-wrap:anywhere]">{subtitle}</p>}
+          {eyebrow && <p className="mb-1 text-[13px] font-semibold text-[var(--color-teal-dark)]">{eyebrow}</p>}
+          <h1 className="ds-h1 text-balance [overflow-wrap:anywhere]">{title}</h1>
+          {subtitle && <p className="mt-1.5 text-sm text-[var(--color-ink-muted)] [overflow-wrap:anywhere]">{subtitle}</p>}
           {meta && <div className="mt-2 flex flex-wrap items-center gap-1.5">{meta}</div>}
         </div>
       </div>

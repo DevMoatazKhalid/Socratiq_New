@@ -29,7 +29,7 @@ export function LearningJourney({ steps }: { steps: JourneyStep[] }) {
               </span>
               <span
                 className={cn(
-                  "min-w-0 text-sm @md:w-full @md:max-w-[6.5rem] @md:text-center @md:text-xs",
+                  "min-w-0 text-sm @md:w-full @md:max-w-[10rem] @md:text-center @md:text-xs",
                   step.state === "upcoming" ? "text-[var(--color-ink-muted)]" : "font-semibold text-[var(--color-ink)]"
                 )}
               >
