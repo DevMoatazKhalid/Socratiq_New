@@ -48,7 +48,7 @@ export default function TeacherAssignmentDetail() {
               <Card className="max-w-2xl">
                 <CardContent>
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-                    <h1 className="min-w-0 text-lg font-semibold text-[var(--color-ink)] [overflow-wrap:anywhere]">{a.title}</h1>
+                    <h1 className="min-w-0 ds-h1 [overflow-wrap:anywhere]">{a.title}</h1>
                     <div className="flex flex-wrap gap-1.5">
                       {a.topic && <Badge tone="teal">{a.topic}</Badge>}
                       <Badge tone={lifecycleTone[life]}>{lifecycleText[life]}</Badge>

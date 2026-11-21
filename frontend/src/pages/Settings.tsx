@@ -1,29 +1,24 @@
 import { AppShell } from "@/components/layout/AppShell"
-import { Card, CardContent } from "@/components/ui/Card"
-import { Input } from "@/components/ui/Input"
-import { Field } from "@/components/ui/Field"
-import { Button } from "@/components/ui/Button"
+import { PageTitle } from "@/components/ds"
 import { useAuth } from "@/lib/auth"
 import type { Role } from "@/types"
 
+/** Settings (approved "E-settings"): the account as the identity provider has it. Read-only by design. */
 export default function Settings({ role }: { role: Role }) {
   const { me, signOut } = useAuth()
-
   return (
-    <AppShell role={role} crumbs={[{ label: role === "student" ? "Home" : "Dashboard", to: role === "student" ? "/student" : "/teacher" }, { label: "Settings" }]}>
-      <Card className="max-w-lg">
-        <CardContent className="space-y-4">
-          <h1 className="text-lg font-semibold text-[var(--color-ink)]">Account</h1>
-          <Field id="account-name" label="Name">
-            <Input id="account-name" value={me?.name ?? ""} readOnly />
-          </Field>
-          <Field id="account-email" label="Email">
-            <Input id="account-email" value={me?.email ?? ""} readOnly type="email" />
-          </Field>
-          <p className="text-xs text-[var(--color-ink-muted)]">Your name and email come from your account. Ask your institution's administrator to change them.</p>
-          <Button variant="outline" onClick={signOut}>Log out</Button>
-        </CardContent>
-      </Card>
+    <AppShell role={role} crumbs={[{ label: "Settings" }]}>
+      <PageTitle title="Settings" subtitle="Your account" />
+      <section className="ds-card max-w-[620px] p-6" aria-labelledby="acct-h">
+        <h2 id="acct-h" className="text-lg font-bold">Account</h2>
+        <dl className="mt-4 space-y-4">
+          <div><dt className="ds-label">Name</dt><dd><input className="ds-input bg-[var(--color-surface-muted)]" value={me?.name ?? ""} readOnly aria-label="Name" /></dd></div>
+          <div><dt className="ds-label">Email</dt><dd><input className="ds-input bg-[var(--color-surface-muted)]" type="email" value={me?.email ?? ""} readOnly aria-label="Email" /></dd></div>
+          <div><dt className="ds-label">Role</dt><dd className="text-sm">{role === "teacher" ? "Instructor" : "Student"}</dd></div>
+        </dl>
+        <p className="mt-4 text-[13px] text-[var(--color-ink-muted)]">Your name and email come from your account. Ask your institution's administrator to change them.</p>
+        <button type="button" className="ds-btn mt-5" onClick={signOut}>Log out</button>
+      </section>
     </AppShell>
   )
 }

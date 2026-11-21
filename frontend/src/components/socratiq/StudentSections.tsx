@@ -226,7 +226,7 @@ export function AssignmentProgress({ items, studentId }: { items: StudentAssignm
       {items.length === 0 ? (
         <p className={emptyText}>No published assignments yet.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full min-w-[480px] text-left text-sm">
             <thead>
               <tr className="bg-[var(--color-surface-muted)] text-xs text-[var(--color-ink-muted)]">

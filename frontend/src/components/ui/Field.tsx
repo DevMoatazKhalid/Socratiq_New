@@ -4,7 +4,7 @@ import type { ReactNode } from "react"
 export function Field({ id, label, error, hint, children, className }: { id: string; label: string; error?: string; hint?: string; children: ReactNode; className?: string }) {
   return (
     <div className={className}>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-[var(--color-ink)]">{label}</label>
+      <label htmlFor={id} className="mb-1.5 block text-[13px] font-semibold text-[var(--color-ink)]">{label}</label>
       {children}
       {error ? (
         <p id={`${id}-error`} className="mt-1.5 text-sm text-[var(--color-danger-ink)]">{error}</p>

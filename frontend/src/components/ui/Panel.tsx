@@ -19,11 +19,11 @@ export function Panel({ id, title, description, right, children, className, acce
 }) {
   const heading = id ? `${id}-heading` : undefined
   return (
-    <section id={id} aria-labelledby={heading} className={cn("scroll-mt-20 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-panel)]", accent && "border-l-4 border-l-[var(--color-plum)]", className)}>
-      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 border-b border-[var(--color-border)] px-5 py-3.5">
+    <section id={id} aria-labelledby={heading} className={cn("scroll-mt-20 rounded-2xl border border-[var(--color-border)] bg-white shadow-[var(--shadow-panel)]", accent && "!border-[var(--color-plum)]", className)}>
+      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-5 pb-1 pt-5">
         <div className="min-w-0">
-          <h2 id={heading} className="text-base font-semibold text-[var(--color-ink)]">{title}</h2>
-          {description && <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">{description}</p>}
+          <h2 id={heading} className="ds-h2 text-base">{title}</h2>
+          {description && <p className="mt-0.5 text-[13px] text-[var(--color-ink-muted)]">{description}</p>}
         </div>
         {right}
       </header>

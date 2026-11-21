@@ -34,7 +34,7 @@ export default function StudentMaterialDetail() {
         {(m) => (
           <Card className="max-w-2xl">
             <CardContent>
-              <h1 className="text-lg font-semibold text-[var(--color-ink)]">{m.title}</h1>
+              <h1 className="ds-h1">{m.title}</h1>
               <p className="mt-1 text-sm text-[var(--color-ink-muted)]">{course.data?.course.name}</p>
               <p className="mt-4 text-[var(--color-ink-soft)]">{m.summary}</p>
               {m.file && (

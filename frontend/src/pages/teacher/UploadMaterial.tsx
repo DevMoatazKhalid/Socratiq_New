@@ -55,7 +55,7 @@ export default function UploadMaterial() {
       role="teacher"
       crumbs={[{ label: "Courses", to: "/teacher/courses" }, { label: course?.name ?? "Course", to: `/teacher/courses/${courseId}` }, { label: "Upload material" }]}
     >
-      <h1 className="text-xl font-semibold text-[var(--color-ink)]">Upload material</h1>
+      <h1 className="ds-h1">Upload material</h1>
       <p className="mt-1 text-sm text-[var(--color-ink-soft)]">{course?.name}</p>
 
       <Card className="mt-6 max-w-xl">

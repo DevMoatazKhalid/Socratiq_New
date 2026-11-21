@@ -8,6 +8,7 @@ const links = [
   { label: "How it works", hash: "how-it-works" },
   { label: "Students", hash: "students" },
   { label: "Teachers", hash: "teachers" },
+  { label: "Smart Board", hash: "smart-board" },
   { label: "Evidence", hash: "evidence" },
 ]
 

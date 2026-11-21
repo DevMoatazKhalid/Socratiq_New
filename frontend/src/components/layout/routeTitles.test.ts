@@ -4,7 +4,8 @@ import { titleFor } from "./routeTitles"
 describe("titleFor", () => {
   it("gives each route its own title", () => {
     expect(titleFor("/login")).toBe("Log in · SocratiQ")
-    expect(titleFor("/teacher")).toBe("Dashboard · SocratiQ")
+    expect(titleFor("/teacher")).toBe("Overview · SocratiQ")
+    expect(titleFor("/student/work")).toBe("My work · SocratiQ")
     expect(titleFor("/student/courses/abc/assignments/xyz/coach")).toBe("AI coach · SocratiQ")
   })
   it("prefers the specific pattern over a parameterised one", () => {

@@ -92,7 +92,7 @@ export function SignupForm({ role }: { role: Role }) {
       <AuthLayout>
         <div role="status" className="flex flex-col items-center py-2 text-center">
           <MailCheck className="h-9 w-9 text-[var(--color-teal-dark)]" aria-hidden="true" />
-          <h1 className="mt-3 text-lg font-semibold text-[var(--color-ink)]">Confirm your email</h1>
+          <h1 className="mt-3 font-serif text-[26px] font-bold leading-tight text-[var(--color-ink)]">Confirm your email</h1>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
             We sent a link to <span className="font-medium text-[var(--color-ink)]">{values.email}</span>. Open it, then log in to finish setting up your account.
           </p>
@@ -105,7 +105,7 @@ export function SignupForm({ role }: { role: Role }) {
   const id = (k: keyof Values) => `${role}-${k}`
   return (
     <AuthLayout wide>
-      <h1 className="text-center text-lg font-semibold text-[var(--color-ink)]">Sign up as {role === "teacher" ? "a teacher" : "a student"}</h1>
+      <h1 className="text-center font-serif text-[28px] font-bold leading-tight text-[var(--color-ink)]">Sign up as {role === "teacher" ? "a teacher" : "a student"}</h1>
       <form ref={formRef} className="mt-6" onSubmit={handleSubmit} noValidate>
         <fieldset disabled={submitting} className="space-y-4 disabled:opacity-80">
           <legend className="sr-only">Create your account</legend>

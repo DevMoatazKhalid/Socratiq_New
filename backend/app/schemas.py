@@ -193,6 +193,47 @@ class NoteCreateIn(StrictRaw):
         return self
 
 
+GROUP_ID = r"^grp_[0-9a-f]{32}$"
+ROW_ID = r"^[A-Za-z0-9_:.-]{1,200}$"          # course / assignment ids as stored (opaque text)
+
+
+class NoteMetaIn(Strict):
+    """Organisation fields of a note (Notes board). Only the fields that are SENT change; an explicit null clears a field.
+    These never bump the note's text version, so they cannot conflict with an edit in another tab."""
+    importance: Optional[Literal["high", "medium", "low"]] = None
+    pinned: Optional[bool] = None
+    course_id: Optional[str] = Field(default=None, pattern=ROW_ID)
+    assignment_id: Optional[str] = Field(default=None, pattern=ROW_ID)
+    group_ids: Optional[list[Annotated[str, StringConstraints(pattern=GROUP_ID)]]] = Field(default=None, max_length=50)
+
+    @model_validator(mode="after")
+    def _something(self):
+        if not self.model_fields_set:
+            raise ValueError("nothing to update")
+        if "pinned" in self.model_fields_set and self.pinned is None:
+            raise ValueError("pinned must be true or false")
+        return self
+
+
+class NoteGroupIn(Strict):
+    name: str = Field(min_length=1, max_length=80)
+    assignment_id: Optional[str] = Field(default=None, pattern=ROW_ID)
+    note_ids: list[Annotated[str, StringConstraints(pattern=NOTE_ID)]] = Field(default_factory=list, max_length=500)
+
+
+class NoteGroupPatchIn(Strict):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    assignment_id: Optional[str] = Field(default=None, pattern=ROW_ID)
+
+    @model_validator(mode="after")
+    def _something(self):
+        if not self.model_fields_set:
+            raise ValueError("nothing to update")
+        if "name" in self.model_fields_set and self.name is None:
+            raise ValueError("name cannot be empty")
+        return self
+
+
 class NotePatchIn(StrictRaw):
     base_version: int = Field(ge=1, le=2_000_000_000)      # the version the client's text is based on (optimistic concurrency)
     title: Optional[str] = Field(default=None, max_length=NOTE_TITLE_MAX)

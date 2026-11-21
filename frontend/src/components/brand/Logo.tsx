@@ -17,6 +17,7 @@ export function LogoMark({ className }: { className?: string }) {
 const sizes = {
   sm: { mark: "h-7", text: "text-xl", gap: "gap-2" },
   md: { mark: "h-8", text: "text-2xl", gap: "gap-2.5" },
+  sidebar: { mark: "h-[26px]", text: "text-[25px]", gap: "gap-2" },
   lg: { mark: "h-8 sm:h-11", text: "text-[1.5rem] sm:text-4xl", gap: "gap-2.5" },
 } as const
 

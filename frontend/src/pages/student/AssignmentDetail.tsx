@@ -1,14 +1,14 @@
 import { useRef, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { AppShell } from "@/components/layout/AppShell"
-import { Card, CardContent } from "@/components/ui/Card"
-import { Button, ButtonLink } from "@/components/ui/Button"
-import { Badge } from "@/components/ui/Badge"
-import { StudentGradeCard } from "@/components/socratiq/GradePanel"
-import { DueDate } from "@/components/socratiq/DueDate"
 import { LearningJourney, type JourneyStep } from "@/components/socratiq/LearningJourney"
 import { QueryState } from "@/components/ui/States"
-import { Paperclip, MessageCircle, Download } from "lucide-react"
+import { Clock, Paperclip, MessageCircle, Download } from "lucide-react"
+import { assignmentStatusLabel } from "@/lib/assignments"
+import { dueInfo } from "@/lib/dates"
+import { formatNumber } from "@/lib/grades"
+import { shortDate, statusTone } from "@/lib/studentWork"
+import { cn } from "@/lib/utils"
 import { downloadFile, useCapabilities, useStartAttempt, useStudentAssignment, useStudentCourse, useSubmitFile } from "@/lib/queries"
 import { formatBytes, precheck } from "@/lib/files"
 import { ApiError } from "@/lib/api"
@@ -75,6 +75,8 @@ export default function StudentAssignmentDetail() {
   const busy = submit.isPending || startAttempt.isPending
   const closed = status === "submitted" || status === "verified"
 
+  const assignmentDue = q.data ? dueInfo(q.data.dueDate, closed) : null
+
   return (
     <AppShell
       role="student"
@@ -86,109 +88,109 @@ export default function StudentAssignmentDetail() {
     >
       <QueryState query={q} what="Assignment">
         {(assignment) => (
-          <div className="grid gap-6">
-            <Card>
-              <CardContent>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h1 className="text-lg font-semibold text-[var(--color-ink)]">{assignment.title}</h1>
-                    <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-                      {[course.data?.course.name, assignment.topic].filter(Boolean).join(" · ")}
+          <div className="grid max-w-[1124px] gap-6">
+            <section className="ds-card px-[30px] pb-7 pt-8" aria-labelledby="asg-title">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h1 id="asg-title" className="ds-h1">{assignment.title}</h1>
+                  <p className="mt-2 text-[15px] text-[var(--color-ink-muted)]">{[course.data?.course.name, assignment.topic].filter(Boolean).join(" · ")}</p>
+                  {assignmentDue && assignmentDue.state !== "none" && (
+                    <p className="mt-2">
+                      <span className={cn("ds-pill", assignmentDue.state === "overdue" ? "ds-pill-bad" : assignmentDue.state === "soon" ? "ds-pill-or" : "ds-pill-neu")} title={assignmentDue.full ?? undefined}>
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        {assignmentDue.state === "soon" ? `Due soon · ${shortDate(assignment.dueDate)}, ${assignmentDue.label.replace(/^Due /, "")}` : assignmentDue.label}
+                      </span>
                     </p>
-                    <div className="mt-2">
-                      <DueDate dueDate={assignment.dueDate} done={closed} />
-                    </div>
-                  </div>
-                  <Badge tone={status === "verified" ? "success" : status === "submitted" ? "teal" : "warning"}>
-                    {status === "verified" ? "Verified" : status === "submitted" ? "Submitted" : status === "in_progress" ? "In progress" : "Not started"}
-                  </Badge>
-                </div>
-
-                <p className="mt-4 whitespace-pre-wrap text-[var(--color-ink-soft)]">{assignment.prompt}</p>
-
-                {assignment.attachments && assignment.attachments.length > 0 && (
-                  <div className="mt-4">
-                    <p className="text-xs font-semibold text-[var(--color-ink-muted)]">Attachments</p>
-                    <ul className="mt-2 space-y-1.5">
-                      {assignment.attachments.map((a) => (
-                        <li key={a.fileId} className="flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-sm">
-                          <span className="min-w-0 truncate text-[var(--color-ink)]">
-                            {a.filename} <span className="text-xs text-[var(--color-ink-muted)]">· {formatBytes(a.sizeBytes)}</span>
-                          </span>
-                          <button onClick={() => void downloadFile(a.fileId)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--color-teal-dark)] hover:bg-[var(--color-surface-muted)]" aria-label={`Download ${a.filename}`}>
-                            <Download className="h-4 w-4" aria-hidden="true" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {file && (
-                  <p className="mt-4 flex items-center gap-2 text-sm text-[var(--color-ink-soft)]">
-                    <Paperclip className="h-4 w-4" /> {file.name} · {formatBytes(file.size)}
-                  </p>
-                )}
-                {assignment.submission?.filename && closed && (
-                  <p className="mt-4 flex items-center gap-2 text-sm text-[var(--color-ink-soft)]">
-                    <Paperclip className="h-4 w-4" /> {assignment.submission.filename}
-                    {assignment.attempt && <span className="text-[var(--color-ink-muted)]">· Attempt {assignment.attempt.attemptNumber}</span>}
-                  </p>
-                )}
-                {busy && progress > 0 && progress < 100 && <p className="mt-2 text-xs text-[var(--color-ink-muted)]">Uploading… {Math.round(progress)}%</p>}
-                {error && (
-                  <p role="alert" className="mt-3 text-sm text-[var(--color-danger-ink)]">
-                    {error}
-                  </p>
-                )}
-                {notice && <p role="status" className="mt-3 text-sm text-[var(--color-warning-ink)]">{notice}</p>}
-
-                <div className="mt-6 flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={() => navigate(-1)}>
-                    Go back
-                  </Button>
-                  <input ref={fileInput} type="file" className="hidden" accept={caps.data?.accept} onChange={(e) => { choose(e.target.files?.[0]); e.target.value = "" }} />
-                  <Button variant="secondary" onClick={() => fileInput.current?.click()} disabled={closed || busy}>
-                    Upload
-                  </Button>
-                  <Button onClick={handleSubmit} disabled={!file || busy || closed}>
-                    {busy ? "Submitting…" : closed ? "Submitted" : "Submit"}
-                  </Button>
-                  {closed && (
-                    <Button variant="outline" onClick={handleRevise} disabled={startAttempt.isPending}>
-                      {startAttempt.isPending ? "Starting…" : "Revise & resubmit"}
-                    </Button>
                   )}
-                  <ButtonLink to={`/student/courses/${courseId}/assignments/${assignment.id}/coach`} variant="primary" className="gap-1.5">
-                      <MessageCircle className="h-4 w-4" /> Ask SocratiQ AI
-                    </ButtonLink>
                 </div>
-                {caps.data && !closed && (
-                  <p className="mt-2 text-xs text-[var(--color-ink-muted)]">Accepted: {caps.data.extensions.map((e) => e.toUpperCase()).join(", ")}.</p>
+                <span className={cn("ds-pill shrink-0", `ds-pill-${statusTone[status]}`)}>{assignmentStatusLabel[status]}</span>
+              </div>
+
+              <p className="mt-5 whitespace-pre-wrap text-[15px] leading-relaxed text-[var(--color-ink)]">{assignment.prompt}</p>
+
+              {assignment.attachments && assignment.attachments.length > 0 && (
+                <div className="mt-5">
+                  <p className="text-[13px] font-semibold text-[var(--color-ink-soft)]">Attachments</p>
+                  <ul className="mt-2 space-y-2">
+                    {assignment.attachments.map((a) => (
+                      <li key={a.fileId} className="flex items-center justify-between gap-3 rounded-[12px] border border-[var(--color-border)] px-4 py-3.5 text-sm">
+                        <span className="min-w-0 truncate text-[var(--color-ink)]">
+                          {a.filename} <span className="text-xs text-[var(--color-ink-muted)]">· {formatBytes(a.sizeBytes)}</span>
+                        </span>
+                        <button onClick={() => void downloadFile(a.fileId)} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--color-teal-dark)] hover:bg-[var(--color-surface-muted)]" aria-label={`Download ${a.filename}`}>
+                          <Download className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {file && (
+                <p className="mt-5 flex items-center gap-2 text-sm text-[var(--color-ink-soft)]">
+                  <Paperclip className="h-4 w-4" aria-hidden="true" /> {file.name} · {formatBytes(file.size)}
+                </p>
+              )}
+              {assignment.submission?.filename && closed && (
+                <p className="mt-5 flex items-center gap-2 text-sm text-[var(--color-ink-soft)]">
+                  <Paperclip className="h-4 w-4" aria-hidden="true" /> {assignment.submission.filename}
+                  {assignment.attempt && <span className="text-[var(--color-ink-muted)]">· Attempt {assignment.attempt.attemptNumber}</span>}
+                </p>
+              )}
+              {busy && progress > 0 && progress < 100 && <p className="mt-2 text-[13px] text-[var(--color-ink-muted)]" role="status">Uploading… {Math.round(progress)}%</p>}
+              {error && <p role="alert" className="mt-3 text-sm text-[var(--color-danger-ink)]">{error}</p>}
+              {notice && <p role="status" className="mt-3 text-sm text-[var(--color-warning-ink)]">{notice}</p>}
+
+              <div className="mt-5 flex flex-wrap gap-2.5">
+                <button type="button" className="ds-btn" onClick={() => navigate(-1)}>Go back</button>
+                <input ref={fileInput} type="file" className="hidden" accept={caps.data?.accept} onChange={(e) => { choose(e.target.files?.[0]); e.target.value = "" }} />
+                <button type="button" className="ds-btn ds-btn-soft" onClick={() => fileInput.current?.click()} disabled={closed || busy}>Upload</button>
+                <button type="button" className="ds-btn ds-btn-pri" onClick={handleSubmit} disabled={!file || busy || closed}>
+                  {busy ? "Submitting…" : closed ? "Submitted" : "Submit"}
+                </button>
+                {closed && (
+                  <button type="button" className="ds-btn" onClick={handleRevise} disabled={startAttempt.isPending}>
+                    {startAttempt.isPending ? "Starting…" : "Revise & resubmit"}
+                  </button>
                 )}
+                <Link to={`/student/courses/${courseId}/assignments/${assignment.id}/coach`} className="ds-btn ds-btn-pri">
+                  <MessageCircle className="h-4 w-4" aria-hidden="true" /> Ask SocratiQ AI
+                </Link>
+              </div>
+              {caps.data && !closed && (
+                <p className="mt-2.5 text-[13px] text-[var(--color-ink-muted)]">Accepted: {caps.data.extensions.map((e) => e.toUpperCase()).join(", ")}.</p>
+              )}
+            </section>
 
-                {status === "submitted" && (
-                  <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--color-teal-light)] bg-[var(--color-teal-light)]/50 p-4">
-                    <p className="text-sm font-medium text-[var(--color-ink)]">Ready for learning verification</p>
-                    <p className="mt-1 text-sm text-[var(--color-ink-soft)]">
-                      Show what you understand about your solution before it's graded — a short, conversational check tied to what you actually submitted.
-                    </p>
-                    <ButtonLink to={`/student/courses/${courseId}/assignments/${assignment.id}/verify`} size="sm" className="mt-3">
-                        Start verification
-                      </ButtonLink>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {status === "submitted" && (
+              <section className="rounded-2xl border border-[var(--color-border)] bg-[#f6f4ea] p-5" aria-labelledby="verify-h">
+                <div className="rounded-[12px] border border-[var(--color-border)] bg-[var(--color-slate-light)]/70 px-5 py-4">
+                  <h2 id="verify-h" className="text-[15px] font-semibold text-[var(--color-ink)]">Ready for learning verification</h2>
+                  <p className="mt-1 text-sm text-[var(--color-ink-soft)]">
+                    Show what you understand about your solution before it's graded — a short, conversational check tied to what you actually submitted.
+                  </p>
+                  <Link to={`/student/courses/${courseId}/assignments/${assignment.id}/verify`} className="ds-btn ds-btn-pri ds-btn-sm mt-3">Start verification</Link>
+                </div>
+              </section>
+            )}
 
-            {assignment.grade && <StudentGradeCard grade={assignment.grade} />}
+            {assignment.grade && (
+              <section id="grade" className="rounded-2xl border border-[var(--color-border)] bg-[#f6f4ea] p-5" aria-labelledby="grade-h">
+                <div className="ds-card px-6 py-5">
+                  <h2 id="grade-h" className="text-lg font-semibold text-[var(--color-ink)]">Your grade</h2>
+                  <p className="mt-1 text-[30px] font-bold leading-tight text-[var(--color-ink)] ds-num">{formatNumber(assignment.grade.score)} / {formatNumber(assignment.grade.maxScore)}</p>
+                  {assignment.grade.feedback && <p className="mt-3 whitespace-pre-wrap rounded-[12px] bg-[#fff8f3] px-4 py-3 text-[15px] text-[var(--color-ink)]">{assignment.grade.feedback}</p>}
+                  <p className="mt-3 text-sm text-[var(--color-ink-muted)]">
+                    Graded {new Date(assignment.grade.gradedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}{assignment.grade.gradedBy ? ` by ${assignment.grade.gradedBy}` : ""}
+                  </p>
+                </div>
+              </section>
+            )}
 
-            <Card>
-              <CardContent>
-                <h2 className="mb-4 text-sm font-semibold text-[var(--color-ink)]">Your learning journey</h2>
-                <LearningJourney steps={journeyFor(status)} />
-              </CardContent>
-            </Card>
+            <section className="ds-card px-6 py-6" aria-labelledby="journey-h">
+              <h2 id="journey-h" className="mb-5 text-lg font-semibold text-[var(--color-ink)]">Your learning journey</h2>
+              <LearningJourney steps={journeyFor(status)} />
+            </section>
           </div>
         )}
       </QueryState>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
 import Markdown from "react-markdown"
+import { Link, useInRouterContext } from "react-router-dom"
 import { AlertCircle, ArrowLeft, Bold, Check, Code, Eye, Heading2, Italic, List, Loader2, NotebookPen, Pencil, Plus, Search, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/Button"
 import { Skeleton } from "@/components/ui/States"
@@ -38,7 +39,7 @@ export default function NotesDrawer({ client = notesApi, sync = defaultSync, onC
       id="notes-panel"
       aria-label="My notes"
       onKeyDown={onKeyDown}
-      className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-[var(--color-border)] bg-white shadow-[-8px_0_24px_rgba(20,17,2,0.08)] sm:w-[420px]"
+      className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-[#ecdfd2] bg-white shadow-[-8px_0_30px_rgb(60_40_10/0.15)] sm:w-[460px]"
     >
       {noteId ? (
         <NoteEditor key={noteId} id={noteId} client={client} sync={sync} onBack={() => { void sync.flush(noteId); notesPanel.set({ noteId: null }) }} onClose={close} />
@@ -97,10 +98,10 @@ function NoteList({ client, sync, onClose }: { client: NotesApi; sync: NotesSync
 
   return (
     <>
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--color-border)] px-4 py-3">
-        <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--color-ink)]"><NotebookPen className="h-4 w-4" aria-hidden="true" />My notes</h2>
-        <div className="flex items-center gap-1">
-          <Button size="sm" onClick={create} data-autofocus><Plus className="h-4 w-4" aria-hidden="true" />New note</Button>
+      <div className="flex items-center justify-between gap-2 px-[18px] py-4">
+        <h2 className="font-serif text-2xl font-bold text-[var(--color-ink)]">My notes</h2>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={create} data-autofocus className="!h-9 !rounded-full !px-4 !text-[13px]"><Plus className="h-4 w-4" aria-hidden="true" />New note</Button>
           <CloseButton onClose={onClose} />
         </div>
       </div>
@@ -118,7 +119,7 @@ function NoteList({ client, sync, onClose }: { client: NotesApi; sync: NotesSync
           />
         </label>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto thin-scroll px-2 py-2">
+      <div className="min-h-0 flex-1 overflow-y-auto thin-scroll bg-[#fff1ea] px-2 py-2">
         {state.status === "loading" && items.length === 0 ? (
           <div className="space-y-2 p-2" aria-busy="true" aria-label="Loading notes">
             <Skeleton className="h-14 w-full" /><Skeleton className="h-14 w-full" /><Skeleton className="h-14 w-full" />
@@ -144,7 +145,7 @@ function NoteList({ client, sync, onClose }: { client: NotesApi; sync: NotesSync
                 <button
                   type="button"
                   onClick={() => notesPanel.set({ noteId: n.id })}
-                  className="w-full rounded-[var(--radius-md)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-plum)]"
+                  className="w-full rounded-[10px] bg-white px-3 py-2.5 text-left shadow-[0_1px_2px_rgb(60_40_10/0.08)] transition-colors hover:bg-[#fffaf6] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-plum)]"
                 >
                   <span className="flex items-baseline justify-between gap-3">
                     <span dir="auto" className="min-w-0 truncate text-sm font-semibold text-[var(--color-ink)]">{n.title || "Untitled note"}</span>
@@ -157,8 +158,18 @@ function NoteList({ client, sync, onClose }: { client: NotesApi; sync: NotesSync
           </ul>
         )}
       </div>
+      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-[#ecdfd2] px-[18px] py-3 text-[13px] text-[#5a5446]">
+        <span>Groups can mix notes from different courses.</span>
+        <FullPageLink onClose={onClose} />
+      </div>
     </>
   )
+}
+
+/** Link to the Notes board page. Rendered as a plain anchor when the drawer is mounted outside a router (isolated tests). */
+function FullPageLink({ onClose }: { onClose: () => void }) {
+  const cls = "font-semibold text-[var(--color-ink)] underline underline-offset-2"
+  return useInRouterContext() ? <Link to="/student/notes" onClick={onClose} className={cls}>Open full page</Link> : <a href="/student/notes" className={cls}>Open full page</a>
 }
 
 // ================================================================== editor
@@ -317,7 +328,7 @@ function EditorHeader({ onBack, onClose, status }: { onBack: () => void; onClose
 function CloseButton({ onClose }: { onClose: () => void }) {
   return (
     <button type="button" onClick={onClose} aria-label="Close notes"
-      className="rounded-[var(--radius-sm)] p-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-plum)]">
+      className="flex h-10 w-10 items-center justify-center rounded-full border border-[#a3a060] bg-white text-[var(--color-ink)] hover:bg-[var(--color-surface-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-plum)]">
       <X className="h-4 w-4" aria-hidden="true" />
     </button>
   )
