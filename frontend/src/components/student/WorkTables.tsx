@@ -64,7 +64,9 @@ export function UpcomingTable({ rows, showCourse = true, title = "Upcoming assig
   )
 }
 
-function verificationPill(v: WorkRow["verification"]) {
+function verificationPill(v: WorkRow["verification"], status?: WorkRow["status"]) {
+  // without per-question counts (older server) the assignment status still says whether the work was verified
+  if (!v && status === "verified") return <Pill tone="ok">Verified</Pill>
   if (!v || v.total === 0) return <Pill tone="neu">None yet</Pill>
   return <Pill tone={v.passed === v.total ? "ok" : "neu"}>{v.passed} of {v.total}</Pill>
 }
@@ -97,7 +99,7 @@ export function GradedTable({ rows, showCourse = true }: { rows: WorkRow[]; show
                   {showCourse && <td>{r.course?.name ?? ""}</td>}
                   <td className="whitespace-nowrap ds-num">{shortDate(r.grade?.gradedAt)}</td>
                   <td><GradeValue pct={r.grade?.percentage} /></td>
-                  <td>{verificationPill(r.verification)}</td>
+                  <td>{verificationPill(r.verification, r.status)}</td>
                   <td className="max-w-[320px] text-[var(--color-ink-muted)]"><span className="line-clamp-2">{r.grade?.feedback || "No written feedback."}</span></td>
                   <td className="text-right">
                     <button type="button" onClick={() => navigate(r.action.to)} className="ds-btn ds-btn-sm !rounded-full">{r.grade ? "View feedback" : "Open"}<span className="sr-only">: {r.a.title}</span></button>

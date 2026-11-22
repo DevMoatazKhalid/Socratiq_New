@@ -6,6 +6,8 @@ import { useCourses } from "@/lib/queries"
 import type { Role } from "@/types"
 import { cn } from "@/lib/utils"
 import { NotesButton } from "@/components/notes/NotesButton"
+import { CelebrationHost } from "@/components/student/CelebrationHost"
+import { ServerNotice } from "./ServerNotice"
 
 /** Height of the visual viewport (shrinks when a phone keyboard opens, which `100dvh` alone does not on iOS Safari). Null until measured / unsupported. */
 function useVisualViewportHeight(enabled: boolean): number | null {
@@ -60,11 +62,14 @@ export function AppShell({
       <div className={cn("flex min-w-0 flex-1 flex-col", fitViewport && "min-h-0")}>
         <PageHeader crumbs={crumbs} search={search} onMenuClick={() => setOpen(true)}
           right={role === "student" ? <>{headerRight}<NotesButton /></> : headerRight} />
-        <main id="main" className={cn("flex-1", fitViewport && "flex min-h-0 flex-col overflow-hidden", mainClassName ?? "p-4 sm:p-6 lg:px-8 lg:pb-10 lg:pt-7")}>
-          {/* Approved layout: content keeps the reference width (1192px) and aligns with the header; workspace pages manage their own size. */}
-          {fitViewport || mainClassName ? children : <div className="max-w-[1192px]">{children}</div>}
+        <ServerNotice role={role} />
+        <main id="main" className={cn("flex-1", fitViewport && "flex min-h-0 flex-col overflow-hidden", mainClassName ?? "p-4 sm:p-5 lg:px-7 lg:pb-8 lg:pt-5")}>
+          {/* Content aligns with the header and uses the width it is given (the approved 1192px at 1440 wide, more on larger screens,
+              capped so lines and tables stay readable); workspace pages manage their own size. */}
+          {fitViewport || mainClassName ? children : <div className="mx-auto max-w-[1560px]">{children}</div>}
         </main>
       </div>
+      {role === "student" && <CelebrationHost />}
     </div>
   )
 }

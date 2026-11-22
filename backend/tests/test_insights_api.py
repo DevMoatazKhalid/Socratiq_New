@@ -17,10 +17,10 @@ def graded_world(w):
     w.x("UPDATE attempts SET status='SUBMITTED' WHERE attempt_id='T1'")
     w.x("""INSERT INTO attempts (attempt_id, student_id, assignment_id, university_id, attempt_number, status) VALUES
            ('T21','S2','A1','U1',1,'SUBMITTED'),('T22','S2','A1','U1',2,'SUBMITTED')""")
-    w.x("""INSERT INTO submissions (submission_id, attempt_id, student_id, assignment_id, university_id, submission_type, submission_text, submitted_at, score, max_score, graded_at) VALUES
-           ('SB1','T1','S1','A1','U1','text','a', now() - interval '3 days', 80, 100, now() - interval '2 days'),
-           ('SB21','T21','S2','A1','U1','text','b', now() - interval '40 days', 45, 50, now() - interval '39 days'),
-           ('SB22','T22','S2','A1','U1','text','c', now() - interval '2 days', 30, 50, now() - interval '1 day')""")
+    w.x("""INSERT INTO submissions (submission_id, attempt_id, student_id, assignment_id, university_id, submission_type, submission_text, submitted_at, score, max_score, graded_at, grade_source) VALUES
+           ('SB1','T1','S1','A1','U1','text','a', now() - interval '3 days', 80, 100, now() - interval '2 days', 'manual'),
+           ('SB21','T21','S2','A1','U1','text','b', now() - interval '40 days', 45, 50, now() - interval '39 days', 'manual'),
+           ('SB22','T22','S2','A1','U1','text','c', now() - interval '2 days', 30, 50, now() - interval '1 day', 'manual')""")
     w.x("""INSERT INTO verification_runs (verification_id, student_id, assignment_id, submission_id, attempt_id, university_id, status, overall_outcome, completed_at)
            VALUES ('VR1','S2','A1','SB22','T22','U1','COMPLETED','NEEDS_RETRY', now() - interval '1 day')""")
     w.x("""INSERT INTO verification_questions (question_id, verification_id, challenge_id, display_order, verification_type, concept, question_text)

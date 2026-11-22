@@ -4,11 +4,12 @@ import { AppShell } from "@/components/layout/AppShell"
 import { CourseCard, courseColor } from "@/components/socratiq/CourseCard"
 import { ArrowLink, Bar, BarChart, Delta, GradeValue, Kpi, Legend, LineChart, NoData, PageTitle, Pill, Section, Select, palette, weekLabel } from "@/components/ds"
 import { GradedTable, UpcomingTable, verificationPill } from "@/components/student/WorkTables"
+import { MomentumCard } from "@/components/student/MomentumCard"
 import { NoMatches, QueryState, Skeleton } from "@/components/ui/States"
 import { useAuth } from "@/lib/auth"
 import { notesPanel } from "@/lib/notes"
 import { useNotesBoard, type BoardNote } from "@/lib/notesBoard"
-import { useStudentHome, useStudentOverview } from "@/lib/queries"
+import { useFallbackGrades, useStudentHome, useStudentOverview } from "@/lib/queries"
 import { matches } from "@/lib/search"
 import { byWhatNeedsYou, shortDate, workRows } from "@/lib/studentWork"
 import { relativeTime } from "@/lib/time"
@@ -32,6 +33,7 @@ export default function StudentHome() {
   const [weeks, setWeeks] = useState(8)
   const overview = useStudentOverview(weeks)
   const notes = useNotesBoard()
+  const fb = useFallbackGrades(home.data?.assignments, overview.data)
   const [query, setQuery] = useState("")
   const [courseId, setCourseId] = useState("all")
 
@@ -40,7 +42,7 @@ export default function StudentHome() {
     if (!d) return null
     const ov = overview.data
     const inCourse = (id: string) => courseId === "all" || id === courseId
-    const all = workRows(d.assignments, d.courses, ov).filter((r) => inCourse(r.a.courseId))
+    const all = workRows(d.assignments, d.courses, ov, fb.map).filter((r) => inCourse(r.a.courseId))
     const rows = all.filter((r) => matches(query, r.a.title, r.a.topic, r.course?.name, r.course?.code))
     const upcoming = rows.filter((r) => !r.done).sort(byWhatNeedsYou)
     const graded = rows.filter((r) => r.grade).sort((a, b) => (b.grade!.gradedAt > a.grade!.gradedAt ? 1 : -1))
@@ -49,7 +51,7 @@ export default function StudentHome() {
       .sort((a, b) => (b.updatedAt > a.updatedAt ? 1 : -1))
     const resume = all.filter((r) => r.status === "in_progress").sort(byWhatNeedsYou)[0] ?? all.filter((r) => r.status === "not_started").sort(byWhatNeedsYou)[0]
     return { all, upcoming, graded, courses, notes: noteList, resume, ov }
-  }, [home.data, overview.data, notes.data, query, courseId])
+  }, [home.data, overview.data, notes.data, query, courseId, fb.map])
 
   const searching = query.trim() !== ""
   const name = me?.name ?? ""
@@ -70,6 +72,11 @@ export default function StudentHome() {
           const perCourse = (ov?.courses ?? []).filter((c) => courseId === "all" || c.courseId === courseId)
           const courseById = new Map(d.courses.map((c) => [c.id, c]))
           const gradedPct = (ov?.assignments ?? []).map((a) => a.grade?.percentage).filter((v): v is number => v != null)
+          // without the overview endpoint (older server) the KPIs are worked out from the assignments and their grades instead of showing "—"
+          const handed = view.all.filter((r) => r.status === "submitted" || r.status === "verified")
+          const fbGraded = view.all.filter((r) => r.grade)
+          const fbAvg = fbGraded.length ? Math.round(fbGraded.reduce((t, r) => t + r.grade!.percentage, 0) / fbGraded.length) : null
+          const fbDue = view.all.filter((r) => !r.done && r.status !== "submitted" && r.due.time != null && r.due.time >= Date.now() && r.due.time - Date.now() < 7 * 86_400_000).length
           return (
             <>
               <PageTitle
@@ -99,6 +106,7 @@ export default function StudentHome() {
                 <>
                   {!searching && (
                     <>
+                      <MomentumCard />
                       {/* KPIs */}
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                         <Kpi label="Courses" value={d.courses.length} hint="Active this term"
@@ -108,13 +116,13 @@ export default function StudentHome() {
                           hint={k ? `${k.submitted} of ${k.assignments} submitted` : `${d.assignments.length - open} of ${d.assignments.length} handed in`}
                           footer={<Delta value={ov?.deltas.completion} />} />
                         <Kpi label="Average grade" highlight spark={trend.map((t) => t.averageGrade)} sparkColor={palette.orange}
-                          value={k?.averageGrade != null ? `${k.averageGrade}%` : "—"}
-                          hint={k ? (k.graded ? `${k.graded} graded · ${k.awaitingGrade} awaiting a grade` : "No graded work yet") : "Appears once work is graded"}
+                          value={k ? (k.averageGrade != null ? `${k.averageGrade}%` : "—") : fbAvg != null ? `${fbAvg}%` : "—"}
+                          hint={k ? (k.graded ? `${k.graded} graded · ${k.awaitingGrade} awaiting a grade` : "No graded work yet") : fbGraded.length ? `${fbGraded.length} graded · ${handed.length - fbGraded.length} awaiting a grade` : "Appears once work is graded"}
                           footer={<Delta value={ov?.deltas.averageGrade} unit="" />} />
                         <Kpi label="Verification" spark={trend.map((t) => t.verificationSuccess)} sparkColor={palette.sage}
-                          value={k ? `${k.verificationsPassed} of ${k.verificationsTotal}` : "—"} hint="Submitted work verified"
+                          value={k ? `${k.verificationsPassed} of ${k.verificationsTotal}` : `${handed.filter((r) => r.status === "verified").length} of ${handed.length}`} hint="Submitted work verified"
                           footer={k && k.verificationsReady > 0 ? <Pill tone="or">{k.verificationsReady} ready now</Pill> : undefined} />
-                        <Kpi label="Due this week" value={k?.dueThisWeek ?? "—"} hint={nextDue ? `Next: ${nextDue.title}` : "Nothing due soon"}
+                        <Kpi label="Due this week" value={k?.dueThisWeek ?? fbDue} hint={nextDue ? `Next: ${nextDue.title}` : "Nothing due soon"}
                           footer={nextIn != null ? <Pill tone="warn">{nextIn === 0 ? "Due today" : nextIn === 1 ? "Due tomorrow" : `Due in ${nextIn} days`}</Pill> : undefined} />
                       </div>
 
@@ -145,7 +153,7 @@ export default function StudentHome() {
                           <p className="ds-sub text-[13px]">Average of graded work · ungraded work isn't counted as zero</p>
                           {perCourse.some((c) => c.averageGrade != null) ? (
                             <>
-                              <div className="mt-6 flex-1">
+                              <div className="mt-5 flex-1">
                                 <BarChart unit="%" max={100} height={230}
                                   bars={perCourse.filter((c) => c.averageGrade != null).map((c) => {
                                     const co = courseById.get(c.courseId)
@@ -164,7 +172,7 @@ export default function StudentHome() {
                   )}
 
                   {/* Courses at a glance + recent notes */}
-                  <div className="mt-6 grid gap-4 lg:grid-cols-[2fr_1fr]">
+                  <div className="mt-5 grid gap-4 lg:grid-cols-[2fr_1fr]">
                     <Section title="My courses at a glance" sub="Progress, grades and what's next in each course" right={<ArrowLink to="/student/courses">All courses</ArrowLink>} flush>
                       <div className="ds-table-wrap">
                         <table className="ds-table min-w-[640px]">
@@ -213,8 +221,8 @@ export default function StudentHome() {
                     </section>
                   </div>
 
-                  <div className="mt-6"><UpcomingTable rows={view.upcoming} /></div>
-                  <div className="mt-6"><GradedTable rows={view.graded} /></div>
+                  <div className="mt-5"><UpcomingTable rows={view.upcoming} /></div>
+                  <div className="mt-5"><GradedTable rows={view.graded} /></div>
 
                   {view.courses.length > 0 && (
                     <>

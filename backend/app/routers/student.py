@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from psycopg import errors as pgerr
 
+from .. import grading
 from ..access import student_assignment, student_attempt, student_course
 from ..auth import CurrentUser, get_db, require_student
 from ..board_auth import is_registered_coach_element, verify_coach_element_id
@@ -129,7 +130,7 @@ def assignment_detail(assignment_id: str, user: CurrentUser = Depends(require_st
     with db.tx() as c:
         a = student_assignment(c, user, assignment_id)
         att = one(c, "SELECT * FROM attempts WHERE student_id=%s AND assignment_id=%s ORDER BY attempt_number DESC LIMIT 1", (user.user_id, assignment_id))
-        sub = one(c, "SELECT s.submission_id, s.submission_type, s.submitted_at, s.score, s.max_score, s.feedback, s.graded_at, f.original_filename, gu.first_name AS g_first, gu.last_name AS g_last FROM submissions s LEFT JOIN stored_files f ON f.file_id=s.file_id LEFT JOIN users gu ON gu.user_id=s.graded_by WHERE s.attempt_id=%s", (att["attempt_id"],)) if att else None
+        sub = one(c, "SELECT s.submission_id, s.submission_type, s.submitted_at, s.score, s.max_score, s.feedback, s.graded_at, s.graded_by, s.grade_source, s.grade_criteria, f.original_filename, gu.first_name AS g_first, gu.last_name AS g_last FROM submissions s LEFT JOIN stored_files f ON f.file_id=s.file_id LEFT JOIN users gu ON gu.user_id=s.graded_by WHERE s.attempt_id=%s", (att["attempt_id"],)) if att else None
         ver = one(c, "SELECT verification_id, status, overall_outcome FROM verification_runs WHERE attempt_id=%s ORDER BY created_at DESC LIMIT 1", (att["attempt_id"],)) if att else None
         out = assignment_view(a, status=student_status(c, user.user_id, assignment_id), attachments=attachments_for(c, assignment_id, include_pending=False))
         out.update({"attempt": _attempt_view(att) if att else None,
@@ -277,16 +278,28 @@ def _finalize(c, user: CurrentUser, attempt_id: str, *, text: Optional[str], fil
     c.execute("UPDATE ai_sessions SET status='ENDED', ended_at=now() WHERE attempt_id=%s AND status='ACTIVE'", (attempt_id,))
     insert_event(c, student_id=user.user_id, university_id=user.university_id, event_type="SUBMISSION", assignment_id=att["assignment_id"], attempt_id=attempt_id,
                  payload={"submission_id": sid, "type": kind, "characters": len(text or "")})
+    # AI grading draft for the instructor (never shown to the student unless the instructor releases it, see app/grading.py)
+    a = one(c, "SELECT * FROM assignments WHERE assignment_id=%s", (att["assignment_id"],))
+    if a is not None and (a.get("ai_grading") or "off") != "off":           # absent before migration 020 -> "off"
+        grading.enqueue(c, assignment=a, submission={"submission_id": sid, "student_id": user.user_id}, trigger="submission", requested_by=None)
     return {"submission_id": sid, "attempt_id": attempt_id, "status": "submitted"}
 
 
 @router.post("/attempts/{attempt_id}/submit")
-def submit_text(attempt_id: str, body: SubmitTextIn, user: CurrentUser = Depends(require_student), db: Database = Depends(get_db)):
+def submit_text(attempt_id: str, body: SubmitTextIn, request: Request, user: CurrentUser = Depends(require_student), db: Database = Depends(get_db)):
     try:
         with db.tx() as c:
-            return _finalize(c, user, attempt_id, text=body.text, file_id=None, file_key=None, kind="text")
+            out = _finalize(c, user, attempt_id, text=body.text, file_id=None, file_key=None, kind="text")
     except pgerr.UniqueViolation:
         raise conflict("This attempt was already submitted.", "already_submitted") from None
+    _kick_grading(request)
+    return out
+
+
+def _kick_grading(request: Request) -> None:
+    w = getattr(request.app.state, "grading_worker", None)
+    if w is not None:
+        w.kick()
 
 
 @router.post("/attempts/{attempt_id}/submit-file", dependencies=[Depends(upload_rate_limit)])
@@ -318,6 +331,7 @@ def _submit_file_sync(request: Request, db: Database, user: CurrentUser, attempt
             if extracted is not None:
                 row = pipeline.mark_done(c, row["file_id"], extracted)
             out = _finalize(c, user, attempt_id, text=(extracted.text if extracted and extracted.pages else None), file_id=row["file_id"], file_key=key, kind="file")
+        _kick_grading(request)
         out["file"] = file_view(row)
         out["text_extracted"] = bool(extracted and extracted.pages)
         if not out["text_extracted"]:

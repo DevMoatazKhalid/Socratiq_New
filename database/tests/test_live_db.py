@@ -89,7 +89,7 @@ def test_real_embedding_dense_retrieval():
     assert len(document_embedding) == 2048
     assert len(query_embedding) == 2048
 
-    store = PgVectorStore()
+    store = PgVectorStore(database_url=URL)
 
     from sqlalchemy import create_engine, text
 

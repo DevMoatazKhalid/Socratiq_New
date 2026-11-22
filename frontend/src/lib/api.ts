@@ -73,6 +73,24 @@ export async function api<T>(path: string, opts: { method?: string; body?: unkno
   return camelize<T>(text ? JSON.parse(text) : undefined)
 }
 
+/** GET a file with the user's token. Returns the body and the server's filename (Content-Disposition, UTF-8 aware). */
+export async function apiBlob(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const t = await accessToken()
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+  } catch {
+    throw new ApiError(0, "Can't reach the server. Check your connection and try again.", "network")
+  }
+  if (!res.ok) throw await toError(res.status, await res.text())
+  const cd = res.headers.get("content-disposition") ?? ""
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd)?.[1]
+  const plain = /filename="?([^";]+)"?/i.exec(cd)?.[1]
+  let filename: string | null = plain ?? null
+  if (star) { try { filename = decodeURIComponent(star) } catch { /* keep the ASCII name */ } }
+  return { blob: await res.blob(), filename }
+}
+
 /** multipart upload with progress (fetch cannot report upload progress). */
 export async function upload<T>(path: string, form: FormData, onProgress?: (pct: number) => void): Promise<T> {
   const token = await accessToken()

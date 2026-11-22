@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react"
+import { QueryClientContext } from "@tanstack/react-query"
+import { NoteDialog } from "./NoteDialog"
+import { NotesBoardView, useNotesContext } from "./NotesBoardView"
+import { useNotesBoard } from "@/lib/notesBoard"
 import Markdown from "react-markdown"
 import { Link, useInRouterContext } from "react-router-dom"
 import { AlertCircle, ArrowLeft, Bold, Check, Code, Eye, Heading2, Italic, List, Loader2, NotebookPen, Pencil, Plus, Search, Trash2, X } from "lucide-react"
@@ -16,6 +20,9 @@ import { cn } from "@/lib/utils"
 export default function NotesDrawer({ client = notesApi, sync = defaultSync, onClose }: { client?: NotesApi; sync?: NotesSync; onClose: () => void }) {
   const { noteId } = useNotesPanel()
   const panelRef = useRef<HTMLElement>(null)
+  // Inside the app the panel shows the same board as the Notes page (groups, importance, filters). Mounted on its own (isolated tests,
+  // no data layer) it falls back to the simple synced list.
+  const inApp = useContext(QueryClientContext) != null
 
   const close = useCallback(() => {
     void sync.flushAll()                          // closing never loses text: anything pending is sent now and keeps retrying in the background
@@ -27,7 +34,7 @@ export default function NotesDrawer({ client = notesApi, sync = defaultSync, onC
     panelRef.current?.querySelector<HTMLElement>("[data-autofocus]")?.focus()
   }, [noteId])
   const onKeyDown = (e: ReactKeyboardEvent) => {
-    if (e.key === "Escape" && !e.defaultPrevented) {
+    if (e.key === "Escape" && !e.defaultPrevented && !(e.target as HTMLElement).closest?.("[role=dialog]")) {   // Escape in the note dialog closes only the dialog
       e.stopPropagation()
       close()
     }
@@ -43,6 +50,8 @@ export default function NotesDrawer({ client = notesApi, sync = defaultSync, onC
     >
       {noteId ? (
         <NoteEditor key={noteId} id={noteId} client={client} sync={sync} onBack={() => { void sync.flush(noteId); notesPanel.set({ noteId: null }) }} onClose={close} />
+      ) : inApp && client === notesApi ? (
+        <BoardPanel sync={sync} onClose={close} />
       ) : (
         <NoteList client={client} sync={sync} onClose={close} />
       )}
@@ -50,7 +59,41 @@ export default function NotesDrawer({ client = notesApi, sync = defaultSync, onC
   )
 }
 
-// ================================================================== list
+// ================================================================== board (same board as the Notes page, in a narrow column)
+function BoardPanel({ sync, onClose }: { sync: NotesSync; onClose: () => void }) {
+  useNotesSync(sync)
+  const [query, setQuery] = useState("")
+  const [view, setView] = useState<"board" | "list">("board")
+  const [open, setOpen] = useState<string | null>(null)
+  const board = useNotesBoard()
+  const ctx = useNotesContext(board.data?.groups ?? [])
+  const openNote = open ? (board.data?.notes ?? []).find((n) => n.id === open) : undefined
+  const create = () => {
+    const d = sync.createLocal()
+    notesPanel.set({ noteId: d.id })
+  }
+  return (
+    <>
+      <div className="flex items-center justify-between gap-2 border-b border-[#ecdfd2] px-[18px] py-3">
+        <h2 className="font-serif text-2xl font-bold text-[var(--color-ink)]">My notes</h2>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={create} data-autofocus className="!h-9 !rounded-full !px-4 !text-[13px]"><Plus className="h-4 w-4" aria-hidden="true" />New note</Button>
+          <CloseButton onClose={onClose} />
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto thin-scroll bg-[#fffaf6] px-4 py-3">
+        <NotesBoardView compact query={query} onQuery={setQuery} view={view} onView={setView} onOpen={setOpen} />
+      </div>
+      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-[#ecdfd2] px-[18px] py-3 text-[13px] text-[#5a5446]">
+        <span>Groups can mix notes from different courses.</span>
+        <FullPageLink onClose={onClose} />
+      </div>
+      {openNote && <NoteDialog note={openNote} ctx={ctx} onClose={() => setOpen(null)} />}
+    </>
+  )
+}
+
+// ================================================================== list (fallback without the data layer)
 function NoteList({ client, sync, onClose }: { client: NotesApi; sync: NotesSync; onClose: () => void }) {
   useNotesSync(sync)
   const { rev } = useNotesPanel()

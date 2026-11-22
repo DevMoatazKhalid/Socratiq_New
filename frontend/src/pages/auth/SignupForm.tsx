@@ -45,11 +45,13 @@ export function SignupForm({ role }: { role: Role }) {
   const needsCode = role === "teacher" && codeRequired
 
   useEffect(() => {
-    fetchUniversities().then((r) => { setUniversities(r.universities); setCodeRequired(Boolean(r.teacher_code_required)) }).catch(() => setFormError("We couldn't load the list of universities. Refresh to try again."))
+    fetchUniversities().then((r) => { setUniversities(r.universities); setCodeRequired(Boolean(r.teacherCodeRequired)) }).catch(() => setFormError("We couldn't load the list of universities. Refresh to try again."))
   }, [])
 
   useEffect(() => {
     if (status === "ready" && me) navigate(homeFor(me.role), { replace: true })
+    // Signed in, but the profile could not be created (e.g. a wrong instructor code): finish on the pre-filled Complete Profile page.
+    if (status === "needs_profile") navigate("/complete-profile", { replace: true })
   }, [status, me, navigate])
 
   function update(key: keyof Values) {

@@ -12,7 +12,7 @@ def test_migration_order():
         "000_extensions.sql","001_rag_pgvector_schema.sql","002_core_university_schema.sql",
         "003_learning_workflow_schema.sql","004_ai_coach_schema.sql","005_verification_schema.sql",
         "006_learning_evidence_schema.sql","007_rls.sql","008_indexes_triggers.sql",
-        "009_tenant_integrity.sql","010_domain_lifecycle.sql","011_file_pipeline.sql","012_indexes.sql","013_rls.sql","014_grading.sql","015_whiteboard.sql","016_whiteboard_scene.sql","017_teaching_personas.sql","018_student_notes.sql","019_notes_board.sql"]
+        "009_tenant_integrity.sql","010_domain_lifecycle.sql","011_file_pipeline.sql","012_indexes.sql","013_rls.sql","014_grading.sql","015_whiteboard.sql","016_whiteboard_scene.sql","017_teaching_personas.sql","018_student_notes.sql","019_notes_board.sql","020_assessment.sql","021_course_icon.sql"]
 
 def test_rag_contract():
     s = read("001_rag_pgvector_schema.sql")
@@ -103,3 +103,34 @@ def test_notes_board_migration_is_additive_owned_and_read_only_through_the_data_
         assert other not in s                                                                    # nothing existing is removed or rewritten
     down = (MIG / "down" / "019_notes_board.down.sql").read_text(encoding="utf-8")
     assert "DROP TABLE IF EXISTS public.student_note_groups" in down and "DROP TABLE IF EXISTS public.student_notes;" not in down
+
+
+def test_assessment_migration_keeps_one_grade_source_and_hides_drafts_from_students():
+    raw = read("020_assessment.sql")
+    s = "\n".join(l for l in raw.splitlines() if not l.strip().startswith("--"))
+    assert s.count("CREATE TABLE IF NOT EXISTS") == 3                                             # drafts, audit trail, celebrations
+    for col in ("points_possible", "rubric", "rubric_source", "reference_answer", "grading_notes", "ai_grading", "grading_updated_at"):
+        assert f"ALTER TABLE public.assignments ADD COLUMN IF NOT EXISTS {col}" in s
+    for col in ("grade_source", "grade_evaluation_id", "grade_criteria"):                           # the released grade stays on submissions (014)
+        assert f"ALTER TABLE public.submissions ADD COLUMN IF NOT EXISTS {col}" in s
+    assert "grade_evaluations_one_active_uk" in s and "WHERE status IN ('QUEUED', 'RUNNING')" in s   # one active grading per submission
+    assert "REFERENCES public.submissions (submission_id, university_id, student_id, assignment_id) ON DELETE CASCADE" in s   # tenant integrity (009)
+    assert "USING (app.teaches_assignment(assignment_id))" in s                                     # AI drafts: instructors only
+    assert "grade_events is append-only" in s
+    assert not re.search(r"GRANT\s+(ALL|INSERT|UPDATE|DELETE)", s)                                 # Data API stays read-only (013)
+    for other in ("DROP TABLE", "TRUNCATE", "DELETE FROM", "DROP COLUMN"):
+        assert other not in s
+    down = (MIG / "down" / "020_assessment.down.sql").read_text(encoding="utf-8")
+    assert "DROP TABLE IF EXISTS public.grade_evaluations" in down and "DROP COLUMN IF EXISTS score" not in down   # released grades survive a rollback
+
+
+def test_course_icon_migration_is_additive_and_limited_to_the_design_icons():
+    raw = read("021_course_icon.sql")
+    s = "\n".join(l for l in raw.splitlines() if not l.strip().startswith("--"))
+    assert "ALTER TABLE public.courses ADD COLUMN IF NOT EXISTS icon text" in s
+    for icon in ("book", "calculator", "flask", "globe", "code", "music", "palette", "atom", "landmark", "pencil", "laptop", "leaf"):
+        assert f"'{icon}'" in s                                                                   # the 12 icons of the approved Create course design
+    for other in ("DROP TABLE", "TRUNCATE", "DELETE FROM", "DROP COLUMN"):
+        assert other not in s
+    down = (MIG / "down" / "021_course_icon.down.sql").read_text(encoding="utf-8")
+    assert "DROP COLUMN IF EXISTS icon" in down and "DROP TABLE" not in down

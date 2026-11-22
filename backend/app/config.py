@@ -77,6 +77,15 @@ class BackendConfig:
         self.ingest_stale_minutes: int = _int("INGEST_STALE_MINUTES", 15, 1)
         self.run_worker: bool = (_clean("RUN_INGEST_WORKER") or "true").lower() not in ("0", "false", "no")
 
+        # --- AI grading (drafts for instructors; see backend/app/grading.py). Runs in the same in-process worker model as ingestion.
+        self.grading_workers: int = _int("GRADING_WORKERS", 1, 1)
+        self.grading_max_attempts: int = _int("GRADING_MAX_ATTEMPTS", 3, 1)
+        self.grading_stale_minutes: int = _int("GRADING_STALE_MINUTES", 10, 1)
+        # Independent gradings per submission (1-3). More runs cost more but expose uncertain grades (they are median-combined).
+        self.grading_samples: int = min(3, _int("GRADING_SAMPLES", 1, 1))
+        # "Auto-release" assignments release an AI grade only at or above this confidence, and only when nothing needs review.
+        self.grading_auto_release_min_confidence: float = min(1.0, max(0.5, _int("GRADING_AUTO_RELEASE_MIN_CONFIDENCE_PCT", 80, 50) / 100))
+
         # --- HTTP
         raw = _clean("CORS_ORIGINS", "CORS_ALLOWED_ORIGINS") or "http://localhost:5173"
         self.cors_origins: List[str] = [o.strip() for o in raw.split(",") if o.strip()]

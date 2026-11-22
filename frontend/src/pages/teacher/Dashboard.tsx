@@ -86,7 +86,7 @@ export default function TeacherDashboard() {
                       </section>
                     </div>
 
-                    <div className="mt-6">
+                    <div className="mt-5">
                       <Section title="Needs attention" sub="Neutral signals from evidence, not conclusions" flush right={rows.length > 0 ? <ArrowLink to="/teacher/review">View all {rows.length}</ArrowLink> : undefined}>
                         {rows.length === 0 ? <p className="px-5 pb-6 text-sm text-[var(--color-ink-muted)]">Nothing needs you right now.</p> : (
                           <div className="ds-table-wrap">
@@ -112,7 +112,7 @@ export default function TeacherDashboard() {
                       </Section>
                     </div>
 
-                    <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                    <div className="mt-5 grid gap-4 lg:grid-cols-2">
                       <Section title="Review signals by type" sub="Signals seen across the class" flush>
                         {ins && ins.signals.byType.length > 0 ? (
                           <table className="ds-table">
@@ -142,7 +142,7 @@ export default function TeacherDashboard() {
                       </Section>
                     </div>
 
-                    <div className="mt-6">
+                    <div className="mt-5">
                       <Section title="Active & recent assignments" flush right={<ArrowLink to="/teacher/assignments">All assignments</ArrowLink>}>
                         {(ins?.assignments ?? []).length === 0 ? <p className="px-5 pb-6 text-sm text-[var(--color-ink-muted)]">No assignments yet. <Link className="underline" to={`/teacher/courses/${course.id}/assignments/new`}>Create one</Link>.</p> : (
                           <div className="ds-table-wrap">

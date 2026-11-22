@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 afterEach(cleanup)
 import { RichText } from "./RichText"
 import { looksLikeCode } from "@/lib/richText"
+import { setKatexForTests } from "@/lib/katex"
+import katex from "katex"
+import { act } from "react"
 
 describe("RichText", () => {
   it("renders inline code without the backticks", () => {
@@ -62,5 +65,51 @@ describe("RichText code-block renderer (in-chat code runner hook)", () => {
     const fn = vi.fn()
     render(<RichText text={"```py\nprint(1)"} renderCodeBlock={fn} />)
     expect(fn).not.toHaveBeenCalled()
+  })
+})
+
+describe("RichText mathematics (AI Coach formulas)", () => {
+  afterEach(() => { cleanup(); setKatexForTests(null) })
+
+  it("typesets inline and display formulas with KaTeX inside the explanation", () => {
+    setKatexForTests(katex)
+    const { container } = render(<RichText text={"The slope is $\\frac{\\Delta y}{\\Delta x}$.\n\n$$\\int_0^1 x^2\\,dx = \\frac{1}{3}$$\nSo the area is a third."} />)
+    const inline = container.querySelector(".sq-math-inline")
+    expect(inline?.querySelector(".katex")).not.toBeNull()
+    expect(inline?.closest("p")).not.toBeNull()                              // inline maths stays in the sentence
+    const display = container.querySelector(".sq-math-display")
+    expect(display?.querySelector(".katex-display")).not.toBeNull()
+    expect(display?.closest("p")).toBeNull()                                 // a display formula is its own block, never inside <p>
+    expect(display?.getAttribute("dir")).toBe("ltr")
+    expect(container.querySelector("math")).not.toBeNull()                   // MathML for screen readers
+    expect(container.textContent).toContain("So the area is a third.")
+  })
+  it("renders multi-line derivations (aligned) as one display block", () => {
+    setKatexForTests(katex)
+    const { container } = render(<RichText text={"\\begin{aligned}(a+b)^2 &= a^2 + 2ab + b^2 \\\\ &= 9\\end{aligned}"} />)
+    expect(container.querySelectorAll(".sq-math-display").length).toBe(1)
+    expect(container.querySelector(".sq-math-display .katex")).not.toBeNull()
+  })
+  it("never treats money or code as maths", () => {
+    setKatexForTests(katex)
+    const { container } = render(<RichText text={"It costs $5 and $10. Run `echo $HOME$` now."} />)
+    expect(container.querySelector(".katex")).toBeNull()
+    expect(container.querySelector("code")?.textContent).toBe("echo $HOME$")
+    expect(container.textContent).toContain("It costs $5 and $10.")
+  })
+  it("shows the TeX source in place until KaTeX has loaded, and for formulas it cannot parse", () => {
+    const { container, rerender } = render(<RichText text={"Before $x^2$ after"} />)
+    expect(container.querySelector(".sq-math-src")?.textContent).toBe("$x^2$")
+    act(() => setKatexForTests(katex))          // KaTeX arriving re-renders the formulas already on screen
+    expect(container.querySelector(".sq-math-inline .katex")).not.toBeNull()
+    rerender(<RichText text={"Bad $\\frac{1}{$ but fine $x^2$"} />)
+    expect(container.querySelectorAll(".sq-math-inline").length).toBe(1)
+    expect(container.textContent).toContain("but fine")
+  })
+  it("formula HTML cannot carry links or scripts (trust is off)", () => {
+    setKatexForTests(katex)
+    const { container } = render(<RichText text={"$\\href{javascript:alert(1)}{x}$ and $\\htmlId{a}{y}$"} />)
+    expect(container.querySelector("a")).toBeNull()
+    expect(container.querySelector("#a")).toBeNull()
   })
 })

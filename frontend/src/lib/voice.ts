@@ -4,6 +4,7 @@
  * Support varies (SpeechRecognition: Chrome/Edge/Safari; not Firefox), so every caller must check `voiceSupport()`.
  */
 import { useCallback, useEffect, useRef, useState } from "react"
+import { speakMath } from "./mathText"
 
 /* Minimal typings: the Web Speech API is not in lib.dom for all TS versions. */
 interface RecResult { isFinal: boolean; 0: { transcript: string } }
@@ -65,9 +66,9 @@ async function detectBrave(): Promise<boolean> {
   return braveCache
 }
 
-/** Strip markdown the voice would read aloud ("star star"), keep the words. */
+/** Strip markdown the voice would read aloud ("star star"), keep the words; formulas are read as words ("x squared"), not as LaTeX. */
 export function speakable(text: string) {
-  return text.replace(/```[\s\S]*?```/g, " (code omitted) ").replace(/[*_`#>]+/g, "").replace(/\s+/g, " ").trim()
+  return speakMath(text.replace(/```[\s\S]*?```/g, " (code omitted) ")).replace(/[*_`#>]+/g, "").replace(/\s+/g, " ").trim()
 }
 
 export function useVoice(opts: { lang: VoiceLang; onTranscript: (text: string) => void }) {

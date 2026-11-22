@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
-import { ChevronLeft, ChevronRight, Download } from "lucide-react"
+import { ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react"
+import type { SubmissionRow } from "@/types"
 import { AppShell } from "@/components/layout/AppShell"
 import { Avatar, GradeValue, NoData, PageTitle, Pill } from "@/components/ds"
 import { NoCourseYet, useTeacherScope } from "@/components/teacher/scope"
@@ -8,12 +9,13 @@ import { RiskPanel } from "@/components/socratiq/RiskPanel"
 import { SmartBoard } from "@/components/socratiq/SmartBoard"
 import { SubmissionSkeleton } from "@/components/socratiq/Skeletons"
 import { QueryState, Skeleton } from "@/components/ui/States"
-import { ApiError } from "@/lib/api"
 import { formatBytes } from "@/lib/files"
 import { formatNumber } from "@/lib/grades"
-import { downloadFile, useSetGrade, useSubmissionReview, useTeacherAssignment, useTeacherStudent, type Grade, type SubmissionReviewData } from "@/lib/queries"
+import { downloadFile, useGradingOverview, useSubmissionReview, useTeacherAssignment, useTeacherStudent, type GradingRow, type SubmissionReviewData } from "@/lib/queries"
+import { AssessmentBar } from "@/components/teacher/AssessmentBar"
+import { ExportGradesButton } from "@/components/teacher/ExportGradesButton"
+import { GradePanel } from "@/components/teacher/GradePanel"
 import { useWhiteboardRealtimeSync } from "@/lib/realtime"
-import { shortDate } from "@/lib/studentWork"
 import { formatDateTime } from "@/lib/time"
 import { gradeLink } from "@/lib/teacherWork"
 import { cn } from "@/lib/utils"
@@ -34,58 +36,6 @@ function Picker({ n, label, children }: { n: number; label: string; children: Re
       </p>
       {children}
     </div>
-  )
-}
-
-function GradeCard({ assignmentId, studentId, grade, hasSubmission, firstName, onNext }: { assignmentId: string; studentId: string; grade: Grade | null; hasSubmission: boolean; firstName: string; onNext: () => void }) {
-  const { save, clear } = useSetGrade(assignmentId, studentId)
-  const [score, setScore] = useState(grade ? formatNumber(grade.score) : "")
-  const [max, setMax] = useState(grade ? formatNumber(grade.maxScore) : "100")
-  const [feedback, setFeedback] = useState(grade?.feedback ?? "")
-  const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
-  function validate() {
-    const s = Number(score), m = Number(max)
-    if (score.trim() === "" || !Number.isFinite(s) || s < 0) return "Enter a score of 0 or more."
-    if (!Number.isFinite(m) || m <= 0) return "The maximum score must be greater than 0."
-    if (s > m) return "The score can't be higher than the maximum."
-    return { score: s, maxScore: m }
-  }
-  const fail = (e: unknown) => setError(e instanceof ApiError ? e.message : "The grade couldn't be saved. Please try again.")
-  function onSave(next: boolean) {
-    const v = validate()
-    if (typeof v === "string") return setError(v)
-    setError(null)
-    save.mutate({ ...v, feedback: feedback.trim() }, { onSuccess: () => { setSaved(true); if (next) onNext() }, onError: fail })
-  }
-  return (
-    <section className="ds-card !border-[var(--color-plum)] p-6" aria-labelledby="gf-h">
-      <h2 id="gf-h" className="text-lg font-bold">Grade & feedback</h2>
-      <p className="text-[13px] text-[var(--color-ink-muted)]">Max score {max || "—"} · {grade ? `graded ${shortDate(grade.gradedAt)}${grade.gradedBy ? ` by ${grade.gradedBy}` : ""}` : "not yet graded"}</p>
-      <div className="mt-3.5 flex items-center gap-2.5">
-        <label className="flex h-[56px] items-center gap-1.5 rounded-[12px] border border-[var(--color-control-border)] px-4 text-[15px]">
-          <span className="sr-only">Score</span>
-          <input inputMode="decimal" value={score} disabled={!hasSubmission} onChange={(e) => { setScore(e.target.value); setSaved(false) }} placeholder="—"
-            className="w-14 bg-transparent text-right text-lg font-bold outline-none placeholder:text-[var(--color-ink)]" aria-label="Score" />
-          <span className="text-[var(--color-ink-muted)]">/</span>
-          <input inputMode="decimal" value={max} disabled={!hasSubmission} onChange={(e) => { setMax(e.target.value); setSaved(false) }} className="w-12 bg-transparent outline-none" aria-label="Out of" />
-        </label>
-        <Pill tone={grade ? "ok" : "neu"}>{grade ? `${formatNumber(grade.percentage)}%` : "Not graded"}</Pill>
-      </div>
-      <label htmlFor="gf-feedback" className="sr-only">Feedback for the student</label>
-      <textarea id="gf-feedback" dir="auto" rows={5} maxLength={4000} value={feedback} disabled={!hasSubmission} onChange={(e) => { setFeedback(e.target.value); setSaved(false) }}
-        placeholder={hasSubmission ? `Write feedback for ${firstName}…` : "You can grade once the student has submitted."} className="ds-input mt-3 min-h-[150px] resize-y" />
-      {error && <p role="alert" className="mt-2 text-sm text-[var(--color-danger-ink)]">{error}</p>}
-      {saved && !error && <p role="status" className="mt-2 text-sm text-[var(--color-success-ink)]">Saved. The student now sees this grade and feedback.</p>}
-      <button type="button" className="ds-btn ds-btn-pri mt-4 w-full !py-3 !text-[15px]" disabled={!hasSubmission || save.isPending} onClick={() => onSave(true)}>
-        {save.isPending ? "Saving…" : grade ? "Update grade & next ›" : "Save grade & next ›"}
-      </button>
-      <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-        <button type="button" className="ds-btn !py-2.5" disabled={!hasSubmission || save.isPending} onClick={() => onSave(false)}>{grade ? "Update grade" : "Save grade"}</button>
-        {grade ? <button type="button" className="ds-btn ds-btn-danger !py-2.5" disabled={clear.isPending} onClick={() => clear.mutate(undefined, { onSuccess: () => { setScore(""); setFeedback("") }, onError: fail })}>Remove grade</button>
-          : <button type="button" className="ds-btn !py-2.5" onClick={onNext}>Skip ›</button>}
-      </div>
-    </section>
   )
 }
 
@@ -119,6 +69,23 @@ function VerificationList({ r }: { r: SubmissionReviewData }) {
   )
 }
 
+/** The state of one student in the list: graded (with a marker if no instructor reviewed it yet), an AI draft (ready / needs review /
+ *  being drafted / failed), to grade, or not submitted. */
+function RowState({ state, grade, row }: { state: "todo" | "graded" | "missing"; grade: { percentage: number; reviewed?: boolean } | null; row?: GradingRow }) {
+  if (state === "missing") return <Pill tone="neu">Not submitted</Pill>
+  if (state === "graded") return (
+    <span className="flex items-center gap-1.5">
+      {grade?.reviewed === false && <Pill tone="warn" title="Released automatically by SocratiQ; not reviewed yet">Auto</Pill>}
+      <GradeValue pct={grade?.percentage} />
+    </span>
+  )
+  const ev = row?.evaluation
+  if (ev && (ev.status === "QUEUED" || ev.status === "RUNNING")) return <Pill tone="neu"><Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />Drafting</Pill>
+  if (ev?.status === "COMPLETED" && !ev.stale) return <Pill tone={ev.needsReview ? "warn" : "info"} title={ev.needsReview ? "AI draft — needs your review" : "AI draft ready to release"}>{ev.needsReview ? "Review" : "Draft"} {formatNumber(Math.round(ev.percentage ?? 0))}%</Pill>
+  if (ev?.status === "FAILED") return <Pill tone="bad">AI failed</Pill>
+  return <Pill tone="or">To grade</Pill>
+}
+
 /** Grade work (approved design): pick a course and an assignment, then grade each student without leaving the page. */
 export default function GradeWork() {
   const navigate = useNavigate()
@@ -131,12 +98,20 @@ export default function GradeWork() {
   const assignments = useMemo(() => (detail.data?.assignments ?? []).filter((a) => a.lifecycle !== "DRAFT"), [detail.data])
   const assignmentId = params.get("assignment") ?? route.assignmentId ?? assignments.find((a) => (insights.data?.submissions ?? []).some((s) => s.assignmentId === a.id && !s.grade))?.id ?? assignments[0]?.id
   const asg = useTeacherAssignment(assignmentId)
+  const overview = useGradingOverview(assignmentId)
+  const rowOf = (sid?: string): GradingRow | undefined => overview.data?.students.find((r) => r.studentId === sid)
   const [filter, setFilter] = useState<"all" | "todo" | "graded">("all")
   const subs = (insights.data?.submissions ?? []).filter((s) => s.assignmentId === assignmentId)
-  const gradeOf = (sid: string) => subs.find((s) => s.studentId === sid)?.grade ?? null
+  // Grade status, most direct source first: the assignment roster itself (any server with this release), then AI grading, then insights.
+  // A grade saved on this page is reflected at once because saving refreshes these queries.
+  // Grades read from opened submissions (every server sends the grade there), so an older server without the sources above still shows
+  // a student as graded once their work has been opened or graded on this page.
+  const [seen, setSeen] = useState<Record<string, { percentage: number; gradedAt: string }>>({})
+  const gradeOf = (sid: string, own?: SubmissionRow["grade"]) =>
+    (own ? { percentage: own.percentage, gradedAt: own.gradedAt ?? "" } : null) ?? rowOf(sid)?.grade ?? subs.find((s) => s.studentId === sid)?.grade ?? seen[`${assignmentId}:${sid}`] ?? null
   const roster = (asg.data?.submissions ?? []).map((s) => {
     const handed = s.status === "submitted" || s.status === "verified"
-    const g = gradeOf(s.studentId)
+    const g = gradeOf(s.studentId, s.grade)
     return { ...s, handed, grade: g, state: !handed ? "missing" as const : g ? "graded" as const : "todo" as const }
   }).sort((a, b) => ({ todo: 0, graded: 1, missing: 2 })[a.state] - ({ todo: 0, graded: 1, missing: 2 })[b.state] || a.studentName.localeCompare(b.studentName))
   const handedIn = roster.filter((s) => s.handed)
@@ -145,6 +120,16 @@ export default function GradeWork() {
   const idx = Math.max(0, roster.findIndex((s) => s.studentId === studentId))
   const shown = roster.filter((s) => filter === "all" || (filter === "todo" ? s.state === "todo" : s.state === "graded"))
   const review = useSubmissionReview(assignmentId, studentId)
+  const reviewed = review.data?.grade
+  useEffect(() => {
+    if (!assignmentId || !studentId) return
+    const k = `${assignmentId}:${studentId}`
+    setSeen((m) => {
+      if (reviewed) return m[k]?.gradedAt === reviewed.gradedAt ? m : { ...m, [k]: { percentage: reviewed.percentage, gradedAt: reviewed.gradedAt } }
+      if (review.data && m[k]) { const rest = { ...m }; delete rest[k]; return rest }
+      return m
+    })
+  }, [assignmentId, studentId, reviewed, review.data])
   const student = useTeacherStudent(studentId)
   const [tab, setTab] = useState<Tab>("Submission")
   useWhiteboardRealtimeSync(assignmentId)
@@ -166,7 +151,7 @@ export default function GradeWork() {
       <QueryState query={courses} what="Grade work" skeleton={<SubmissionSkeleton />}>
         {(list) => !course ? <NoCourseYet /> : (
           <>
-            <div className="ds-card grid gap-5 px-7 py-6 md:grid-cols-2 xl:grid-cols-[1.1fr_1.3fr_1fr_0.9fr]">
+            <div className="ds-card grid gap-4 px-5 py-5 md:grid-cols-2 xl:grid-cols-[1.1fr_1.3fr_1fr_0.9fr] xl:px-6">
               <Picker n={1} label="Course">
                 <select aria-label="Course" className="ds-sel w-full !py-3 !text-[15px] !font-semibold" value={course.id} onChange={(e) => { setCourse(e.target.value); setParams({ course: e.target.value }, { replace: true }) }}>
                   {list.map((c) => <option key={c.id} value={c.id}>{c.name} · {c.code}</option>)}
@@ -194,8 +179,15 @@ export default function GradeWork() {
               </div>
             </div>
 
+            {assignmentId && overview.data && (
+              <AssessmentBar assignmentId={assignmentId} assignmentTitle={asg.data?.title ?? "Assignment"} courseId={course.id}
+                courseLabel={`${course.name} · ${course.code}`} overview={overview.data} />
+            )}
+            {assignmentId && overview.data === null && (
+              <div className="mt-5 flex justify-end"><ExportGradesButton compact courseId={course.id} courseLabel={`${course.name} · ${course.code}`} assignment={asg.data ? { id: asg.data.id, title: asg.data.title } : undefined} /></div>
+            )}
             {!assignmentId ? <div className="mt-5"><NoData title="Nothing to grade yet">Publish an assignment and wait for submissions.</NoData></div> : (
-              <div className="mt-5 grid items-start gap-5 xl:grid-cols-[264px_minmax(0,1fr)_340px]">
+              <div className="mt-5 grid items-start gap-5 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
                 <section className="ds-card overflow-hidden" aria-labelledby="st-h">
                   <div className="px-5 pt-5">
                     <h2 id="st-h" className="text-lg font-bold">Students</h2>
@@ -212,8 +204,8 @@ export default function GradeWork() {
                         <button type="button" onClick={() => go({ student: s.studentId })} aria-current={s.studentId === studentId ? "true" : undefined}
                           className={cn("flex w-full items-center gap-3 border-t border-[#eeeee0] px-5 py-3.5 text-left", s.studentId === studentId ? "bg-[var(--color-plum-light)]" : "hover:bg-[#fffaf6]", s.state === "missing" && "opacity-70")}>
                           <Avatar name={s.studentName} className="!h-10 !w-10" />
-                          <b className="min-w-0 flex-1 font-semibold">{s.studentName}</b>
-                          {s.state === "todo" ? <Pill tone="or">To grade</Pill> : s.state === "missing" ? <Pill tone="neu">Not submitted</Pill> : <GradeValue pct={s.grade?.percentage} />}
+                          <b className="min-w-0 flex-1 break-words font-semibold leading-snug">{s.studentName}</b>
+                          <RowState state={s.state} grade={s.grade} row={rowOf(s.studentId)} />
                         </button>
                       </li>
                     ))}
@@ -311,9 +303,13 @@ export default function GradeWork() {
                 </section>
 
                 <div className="space-y-5 xl:sticky xl:top-24">
-                  {review.data && studentId ? (
-                    <GradeCard key={`${studentId}:${review.data.grade?.gradedAt ?? "none"}`} assignmentId={assignmentId} studentId={studentId} grade={review.data.grade}
-                      hasSubmission={!!review.data.submission} firstName={review.data.student.name.split(" ")[0]} onNext={next} />
+                  {review.data && studentId && !overview.isPending ? (
+                    <GradePanel key={`${studentId}:${review.data.grade?.gradedAt ?? "none"}:${overview.data?.settings.updatedAt ?? ""}:${review.data.submission?.id ?? ""}`}
+                      assignmentId={assignmentId} studentId={studentId} grade={review.data.grade}
+                      hasSubmission={!!review.data.submission} firstName={review.data.student.name.split(" ")[0]} onNext={next}
+                      settings={overview.data?.settings ?? null}
+                      evaluation={rowOf(studentId)?.evaluation ?? review.data.evaluation ?? null}
+                      history={review.data.gradeHistory ?? []} />
                   ) : <Skeleton className="h-[360px] rounded-2xl" />}
                   <section className="ds-card p-6" aria-labelledby="le-h">
                     <h2 id="le-h" className="text-lg font-bold">Learning evidence</h2>
