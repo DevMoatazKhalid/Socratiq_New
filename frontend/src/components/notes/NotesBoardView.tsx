@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { Pin, SlidersHorizontal } from "lucide-react"
 import { courseColor } from "@/components/socratiq/CourseCard"
 import { QueryState, Skeleton } from "@/components/ui/States"
+import { RichText } from "@/components/ui/RichText"
 import { importanceLabel, useNoteMeta, useNotesBoard, type BoardNote, type Importance, type NoteGroup } from "@/lib/notesBoard"
 import { useStudentHome } from "@/lib/queries"
 import { matches } from "@/lib/search"
@@ -62,7 +63,7 @@ export function Sticky({ note, ctx, also, onOpen }: { note: BoardNote; ctx: Note
       aria-label={`${note.title || "Untitled note"}${note.importance ? `, ${importanceLabel[note.importance]} importance` : ""}`}
       className={cn("ds-sticky cursor-pointer focus-visible:outline-offset-2", stickyClass(note.importance))}>
       <b dir="auto" className="text-[13.5px] font-bold text-[var(--color-ink)]">{note.title || "Untitled note"}</b>
-      <p dir="auto" className="line-clamp-3 flex-1 whitespace-pre-line text-[13.5px] leading-[1.45] text-[#3d3828]">{plainPreview(note.preview)}</p>
+      <p dir="auto" className="line-clamp-3 flex-1 text-[13.5px] leading-[1.45] text-[#3d3828]"><RichText text={note.preview} compact /></p>
       {also && also.length > 0 && <p className="text-[11px] text-[#6b5a3a]">Also in {also.join(", ")}</p>}
       <div className="flex items-center justify-between gap-1.5 text-[11px] font-semibold text-[#4a4436]">
         <span className="flex min-w-0 items-center gap-1.5"><CourseDot course={course} /><span className="truncate">{course?.name ?? "No course"} · {noteDate(note.updatedAt)}</span></span>
@@ -83,7 +84,7 @@ export function ListRowNote({ note, ctx, onOpen }: { note: BoardNote; ctx: Notes
         <p className="flex flex-wrap items-center gap-1.5 text-xs text-[#5a5446]">
           <CourseDot course={course} />{[course?.name ?? "No course", asg?.title, origin(note), noteDate(note.updatedAt)].filter(Boolean).join(" · ")}
         </p>
-        <p dir="auto" className="my-1 line-clamp-2 text-sm text-[var(--color-ink)]">{plainPreview(note.preview)}</p>
+        <p dir="auto" className="my-1 line-clamp-2 text-sm text-[var(--color-ink)]"><RichText text={note.preview} compact /></p>
         <div className="flex flex-wrap gap-1.5">
           {note.groupIds.map((g) => ctx.groupById.get(g)).filter(Boolean).map((g) => <span key={g!.id} className="rounded-full bg-[#eeeadc] px-2.5 py-px text-[11px] font-semibold text-[#5c5a2a]">{g!.name}</span>)}
         </div>

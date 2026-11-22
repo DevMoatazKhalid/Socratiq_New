@@ -1,5 +1,5 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from "react"
-import ReactMarkdown from "react-markdown"
+import { RichText } from "@/components/ui/RichText"
 import { ChevronDown, Sparkles, MessageSquare, Mic, Send, Square, X, Loader2 } from "lucide-react"
 import { MathView } from "@/components/socratiq/MathView"
 import { SmartBoard, type Tool, type ViewState, type SmartBoardHandle } from "@/components/socratiq/SmartBoard"
@@ -2218,7 +2218,7 @@ export const BoardWorkspace = forwardRef<BoardApi, Props>(function BoardWorkspac
                         ? "bg-blue-600 text-white rounded-tr-sm"
                         : (theme === "dark" ? "bg-zinc-800 text-zinc-100 border border-zinc-700 rounded-tl-sm" : "bg-gray-100 text-gray-800 border border-gray-200 rounded-tl-sm")
                     )}>
-                      {msg.role === "model" ? <ReactMarkdown>{msg.text}</ReactMarkdown> : msg.text}
+                      {msg.role === "model" ? <RichText text={msg.text} /> : <span dir="auto" className="whitespace-pre-wrap">{msg.text}</span>}
                       {msg.sources && msg.sources.length > 0 && (
                         <div className="mt-2 pt-1.5 border-t border-gray-300 dark:border-zinc-700 flex flex-wrap gap-1 text-[10px]">
                           <span className="font-semibold text-gray-500 dark:text-zinc-400">Sources:</span>

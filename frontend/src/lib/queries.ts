@@ -584,8 +584,35 @@ export interface DiagramRequest { request: string; board: { id: string; text: st
 export const generateDiagram = (body: DiagramRequest) =>
   api<{ spec: unknown; attempts: number; coachElementId?: string }>(`/smartboard/generate-diagram`, { method: "POST", body: { request: body.request, board: body.board, selected_id: body.selectedId ?? null, ...(body.assignmentId ? { assignment_id: body.assignmentId } : {}), ...(body.grant ? { grant: body.grant } : {}) } })
 
-export const generateImage = (prompt: string, size = "1K", assignmentId?: string | null) =>
-  api<{ imageUrl: string }>(`/smartboard/generate-image`, { method: "POST", body: { prompt, size, ...(assignmentId ? { assignment_id: assignmentId } : {}) } })
+/** One image from POST /smartboard/generate-image. `source: "reference"` means no AI image could be made and a licensed reference image (Wikimedia
+ * Commons) was returned instead; its `attribution` must stay visible next to it. */
+export interface GeneratedImage {
+  imageUrl: string
+  mimeType?: string
+  width?: number
+  height?: number
+  source?: "generated" | "reference"
+  provider?: string
+  model?: string
+  style?: string
+  aspectRatio?: string
+  title?: string
+  attribution?: { text: string; url?: string; license?: string; author?: string } | null
+}
+export interface ImageRequestOptions { style?: string; aspect?: string; quality?: "standard" | "high" }
+
+export const generateImage = (prompt: string, opts: ImageRequestOptions = {}, assignmentId?: string | null) =>
+  api<GeneratedImage>(`/smartboard/generate-image`, {
+    method: "POST",
+    body: {
+      prompt,
+      size: opts.quality === "high" ? "2K" : "1K",
+      style: opts.style ?? "auto",
+      aspect_ratio: opts.aspect ?? "auto",
+      quality: opts.quality ?? "standard",
+      ...(assignmentId ? { assignment_id: assignmentId } : {}),
+    },
+  })
 
 export const generateSimulation = (prompt: string, title?: string, assignmentId?: string | null, grant?: string | null) =>
   api<{ code: string; coachElementId?: string }>(`/smartboard/generate-simulation`, { method: "POST", body: { prompt, title, ...(assignmentId ? { assignment_id: assignmentId } : {}), ...(grant ? { grant } : {}) } })

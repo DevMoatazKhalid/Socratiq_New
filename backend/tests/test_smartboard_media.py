@@ -91,6 +91,7 @@ class _Resp:
 class _FakeHttpx:
     """Stands in for httpx.AsyncClient; records every request so tests can assert how the key is sent."""
     calls: list = []
+    payloads: list = []
     plan: list = []
 
     def __init__(self, *a, **k): pass
@@ -99,6 +100,7 @@ class _FakeHttpx:
 
     async def post(self, url, json=None, headers=None):
         _FakeHttpx.calls.append((url, headers))
+        _FakeHttpx.payloads.append(json)
         r = _FakeHttpx.plan.pop(0)
         if isinstance(r, Exception):
             raise r
@@ -107,8 +109,12 @@ class _FakeHttpx:
 
 @pytest.fixture
 def fake(monkeypatch):
-    _FakeHttpx.calls, _FakeHttpx.plan = [], []
+    _FakeHttpx.calls, _FakeHttpx.plan, _FakeHttpx.payloads = [], [], []
     monkeypatch.setenv("GEMINI_API_KEY", "TESTKEY-never-log-me")
+    # a fixed two-model chain and no art-director call, so each test scripts exactly the provider responses it is about
+    # (planning and the full chain are covered in test_image_generation.py)
+    monkeypatch.setenv("SMARTBOARD_IMAGE_PLANNER", "0")
+    monkeypatch.setenv("SMARTBOARD_IMAGE_MODELS", "imagen-4.0-generate-001,gemini-2.5-flash-image")
     monkeypatch.setattr(httpx, "AsyncClient", _FakeHttpx)
     return _FakeHttpx
 
@@ -155,6 +161,23 @@ def test_generate_image_rejects_a_malicious_provider_payload(fake):
 def test_generate_image_validates_the_prompt(fake, prompt):
     assert _client().post(f"{SB}/generate-image", json={"prompt": prompt}).status_code == 422
     assert fake.calls == []                                   # nothing was sent to the provider
+
+
+@pytest.mark.parametrize("field,value", [("style", "anime"), ("aspect_ratio", "2:1"), ("quality", "ultra")])
+def test_generate_image_validates_the_options(fake, field, value):
+    assert _client().post(f"{SB}/generate-image", json={"prompt": "a cell", field: value}).status_code == 422
+    assert fake.calls == []
+
+
+def test_generate_image_reports_what_it_made_and_honours_the_options(fake):
+    fake.plan = [_imagen(_img("PNG", (64, 48)))]
+    r = _client().post(f"{SB}/generate-image", json={"prompt": "labelled diagram of a plant cell", "style": "diagram", "aspect_ratio": "4:3", "quality": "high"})
+    body = r.json()
+    assert r.status_code == 200 and body["source"] == "generated" and body["provider"] == "imagen" and body["model"] == "imagen-4.0-generate-001"
+    assert body["style"] == "diagram" and body["aspect_ratio"] == "4:3" and body["title"] and body["attribution"] is None
+    sent = fake.payloads[0]
+    assert sent["parameters"]["aspectRatio"] == "4:3" and sent["parameters"]["sampleImageSize"] == "2K"      # high quality -> 2K
+    assert "labelled educational diagram" in sent["instances"][0]["prompt"] and "white background" in sent["instances"][0]["prompt"]
 
 
 def _gem(text): return _Resp(200, {"candidates": [{"content": {"parts": [{"text": text}]}}]})

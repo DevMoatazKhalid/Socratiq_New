@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { hasMath, mathToSpeech, speakMath, splitMath } from "./mathText"
+import { hasMath, isMostlyTex, mathToSpeech, parseMath, repairLatexEscapes, speakMath, splitMath } from "./mathText"
 
 const math = (input: string) => splitMath(input).filter((s) => s.kind === "math").map((s) => (s.kind === "math" ? [s.tex, s.display] : []))
 const text = (input: string) => splitMath(input).map((s) => (s.kind === "text" ? s.text : `<${s.kind === "math" ? s.tex : ""}>`)).join("")
@@ -71,5 +71,41 @@ describe("read-aloud of formulas", () => {
     const spoken = speakMath("The area is $\\pi r^2$ square units.")
     expect(spoken).toContain("pi r squared")
     expect(spoken).not.toMatch(/[$\\]/)
+  })
+})
+
+describe("parseMath: maths as it really reaches the chat", () => {
+  const FF = "\f", CR = "\r", TAB = "\t", BS = "\b"
+  const only = (s: string) => parseMath(s).filter((x) => x.kind === "math").map((x) => (x.kind === "math" ? [x.tex, x.display] : []))
+  const ODE = "\\left(\\frac{d^{2}y}{dx^{2}}\\right)^{4}=y+\\left(\\frac{dy}{dx}\\right)^{6}"
+
+  it("restores LaTeX that the JSON decoder turned into control characters (\\frac -> form feed, \\right -> CR, ...)", () => {
+    const mangled = `\\[\n\\left(${FF}rac{d^{2}y}{dx^{2}}${CR}ight)^{4}=y+\\left(${FF}rac{dy}{dx}${CR}ight)^{6}\n\\]`
+    expect(only(mangled)).toEqual([[ODE, true]])
+    expect(repairLatexEscapes(`$${TAB}heta ${TAB}imes ${BS}eta$`)).toBe("$\\theta \\times \\beta$")
+    expect(repairLatexEscapes("$$a \neq b$$")).toBe("$$a \\neq b$$")
+  })
+  it("never touches ordinary newlines, CRLF or a display formula that starts with e or u", () => {
+    const s = "Line one\nnot maths\r\nnext\n$$\ne^{i\\pi}+1=0\n$$"
+    expect(repairLatexEscapes(s)).toBe(s)
+  })
+  it("understands the bracket form left when a Markdown renderer ate the backslashes", () => {
+    expect(only(`المعادلة:\n[\n${ODE}\n]\nرتبتها 2`)).toEqual([[ODE, true]])
+    expect(only("[ \\frac{a}{b} = c ]")).toEqual([["\\frac{a}{b} = c", true]])
+    expect(only("The derivative ( \\frac{dy}{dx} ) is the slope (see notes).")).toEqual([["\\frac{dy}{dx}", false]])
+    expect(only("[see the notes]")).toEqual([])
+  })
+  it("understands double-escaped delimiters", () => {
+    expect(only("Then \\\\( x^2 \\\\) and \\\\[ \\\\frac{a}{b} \\\\]")).toEqual([["x^2", false], ["\\frac{a}{b}", true]])
+  })
+  it("typesets a line that is nothing but LaTeX, but never a sentence that mentions a command", () => {
+    expect(only("So we have\n\\int_0^1 x^2\\,dx = \\frac{1}{3}\nwhich is a third.")).toEqual([["\\int_0^1 x^2\\,dx = \\frac{1}{3}", true]])
+    expect(only("Use \\frac to write fractions")).toEqual([])
+    expect(isMostlyTex("\\text{speed} = \\frac{d}{t}")).toBe(true)
+    expect(isMostlyTex("\\frac الكسر")).toBe(false)
+  })
+  it("marks an unfinished display formula as pending while streaming", () => {
+    expect(parseMath("Let me write it:\n$$\\int_0^", { streaming: true }).map((s) => s.kind)).toEqual(["text", "pending"])
+    expect(parseMath("So $$x^").map((s) => s.kind)).toEqual(["text"])
   })
 })

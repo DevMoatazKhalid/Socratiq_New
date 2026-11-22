@@ -3,7 +3,7 @@ import { QueryClientContext } from "@tanstack/react-query"
 import { NoteDialog } from "./NoteDialog"
 import { NotesBoardView, useNotesContext } from "./NotesBoardView"
 import { useNotesBoard } from "@/lib/notesBoard"
-import Markdown from "react-markdown"
+import { RichText } from "@/components/ui/RichText"
 import { Link, useInRouterContext } from "react-router-dom"
 import { AlertCircle, ArrowLeft, Bold, Check, Code, Eye, Heading2, Italic, List, Loader2, NotebookPen, Pencil, Plus, Search, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/Button"
@@ -321,7 +321,7 @@ function NoteEditor({ id, client, sync, onBack, onClose }: { id: string; client:
         </div>
         {preview ? (
           <div dir="auto" className="notes-markdown min-h-0 flex-1 overflow-y-auto thin-scroll text-sm leading-relaxed text-[var(--color-ink)]">
-            {draft.content.trim() ? <Markdown skipHtml>{draft.content}</Markdown> : <p className="text-[var(--color-ink-muted)]">Nothing to preview yet.</p>}
+            {draft.content.trim() ? <RichText text={draft.content} /> : <p className="text-[var(--color-ink-muted)]">Nothing to preview yet.</p>}
           </div>
         ) : (
           <>
@@ -332,7 +332,7 @@ function NoteEditor({ id, client, sync, onBack, onClose }: { id: string; client:
               dir="auto"
               value={draft.content}
               maxLength={100000}
-              placeholder="Write your note… Markdown works: **bold**, _italic_, ## headings, - lists, `code`."
+              placeholder="Write your note… Markdown works: **bold**, _italic_, ## headings, - lists, `code`, and maths like $x^2$ or $$\frac{a}{b}$$."
               onChange={(e) => sync.edit(id, { content: e.target.value })}
               className="min-h-0 w-full flex-1 resize-none rounded-[var(--radius-sm)] border-none bg-transparent px-0 text-sm leading-relaxed text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-plum)]"
             />

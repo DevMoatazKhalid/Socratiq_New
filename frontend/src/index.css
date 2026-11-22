@@ -164,7 +164,10 @@ html { scroll-behavior: auto; }
 .tok-decorator { color: #6b4fa0; }
 
 /* ------------------------------------------------------------------ mathematics in chat (KaTeX, see components/ui/MathFormula.tsx) */
-.sq-math-inline { white-space: nowrap; unicode-bidi: isolate; }
+.sq-math-inline { unicode-bidi: isolate; max-width: 100%; }
+/* long inline formulas may break after a relation or operator (KaTeX emits break points between its .base boxes) instead of overflowing */
+.sq-math-inline .katex, .sq-math-inline .katex-html { white-space: normal; }
+.sq-math-inline .katex .base { margin-block: 0.1em; }
 .sq-math-inline .katex { font-size: 1.07em; }
 .sq-math-display { position: relative; margin: 0.65rem 0; border-radius: 12px; background: #fbf8f1; border: 1px solid var(--color-border);
   border-inline-start: 3px solid var(--color-plum); }
@@ -219,3 +222,46 @@ html { scroll-behavior: auto; }
    under an English line (or the reverse) came out in the wrong word order. plaintext resolves the direction per paragraph instead. */
 textarea[dir="auto"], input[dir="auto"], [dir="auto"] { unicode-bidi: plaintext; text-align: start; }
 .notes-markdown p, .notes-markdown li, .notes-markdown h1, .notes-markdown h2, .notes-markdown h3, .notes-markdown blockquote { unicode-bidi: plaintext; text-align: start; }
+
+/* ------------------------------------------------------------------ rich learning content (components/ui/RichText.tsx) */
+.sq-rich { display: flow-root; }
+.sq-rich > * + * { margin-top: 0.6em; }
+.sq-rich > .sq-math-display { margin-block: 0.75em; }
+.sq-rich p { line-height: 1.7; }
+.sq-h { font-weight: 650; color: var(--color-ink); line-height: 1.35; }
+.sq-h-lg { font-size: 1.06em; }
+.sq-rich > .sq-h:not(:first-child) { margin-top: 0.95em; }
+.sq-list { padding-inline-start: 1.35em; display: grid; gap: 0.3em; }
+.sq-list .sq-list { margin-top: 0.3em; }
+.sq-list > li::marker { color: var(--color-teal-dark); }
+ol.sq-list > li::marker { font-weight: 600; font-variant-numeric: tabular-nums; }
+.sq-quote { border-inline-start: 3px solid var(--color-teal-dark); padding-inline-start: 0.8em; color: var(--color-ink-soft); }
+.sq-hr { border: 0; border-top: 1px solid var(--color-border); margin-block: 0.9em; }
+.sq-code-inline { unicode-bidi: isolate; border-radius: 4px; background: rgb(0 0 0 / 0.06); padding: 0.05em 0.35em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em; overflow-wrap: anywhere; }
+.sq-table-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 10px; }
+.sq-table { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+.sq-table th, .sq-table td { padding: 0.4em 0.7em; border-bottom: 1px solid var(--color-border); text-align: start; vertical-align: top; }
+.sq-table th { background: var(--color-surface-muted, #f6f4ef); font-weight: 600; }
+.sq-table tr:last-child td { border-bottom: 0; }
+.sq-rich-compact .sq-math-inline .katex { font-size: 1em; }
+.sq-math-pending { margin-block: 0.65rem; height: 2.6rem; border-radius: 12px; border: 1px dashed var(--color-border); background: #fbf8f1; display: flex; align-items: center;
+  padding-inline: 0.9rem; }
+.sq-math-pending-bar { height: 0.55rem; width: 45%; border-radius: 999px;
+  background: linear-gradient(90deg, rgb(15 118 110 / 0.10), rgb(15 118 110 / 0.28), rgb(15 118 110 / 0.10)); background-size: 200% 100%;
+  animation: sq-shimmer 1.4s ease-in-out infinite; }
+.sq-math-pending-inline { color: var(--color-ink-muted); }
+@keyframes sq-shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .sq-math-pending-bar { animation: none; } }
+
+/* ------------------------------------------------------------------ SmartBoard AI bar (components/smartboard/*) */
+.sq-ask-trigger { background: linear-gradient(135deg, #0f766e 0%, #0d9488 55%, #14b8a6 100%);
+  box-shadow: 0 1px 2px rgb(15 118 110 / 0.25), 0 4px 14px -4px rgb(13 148 136 / 0.55); }
+.sq-ask-trigger:hover:not(:disabled) { filter: brightness(1.06); box-shadow: 0 1px 2px rgb(15 118 110 / 0.3), 0 6px 18px -4px rgb(13 148 136 / 0.65); }
+.sq-ask-menu { animation: sq-ask-in 140ms ease-out both; transform-origin: bottom left; }
+@keyframes sq-ask-in { from { opacity: 0; transform: translateY(4px) scale(0.98); } to { opacity: 1; transform: none; } }
+.sq-progress-track { position: relative; display: block; height: 3px; overflow: hidden; border-radius: 999px; background: rgb(15 118 110 / 0.12); }
+.sq-progress-bar { position: absolute; inset-block: 0; width: 35%; border-radius: 999px; background: linear-gradient(90deg, #0d9488, #14b8a6);
+  animation: sq-indeterminate 1.6s ease-in-out infinite; }
+@keyframes sq-indeterminate { 0% { left: -35%; } 100% { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .sq-ask-menu, .sq-progress-bar { animation: none; } .sq-progress-bar { left: 0; width: 100%; opacity: 0.5; } }

@@ -35,6 +35,17 @@ export function MathFormula({ tex, display = false, raw, className }: { tex: str
   )
 }
 
+/** Where a display formula will appear while its closing delimiter is still streaming in: a calm placeholder, never half-typed TeX. */
+export function MathPending({ inline = false }: { inline?: boolean }) {
+  if (inline) return <span className="sq-math-pending-inline" role="status" aria-label="Writing an equation">…</span>
+  return (
+    <div className="sq-math-pending" role="status" aria-live="polite">
+      <span className="sq-math-pending-bar" aria-hidden="true" />
+      <span className="sr-only">Writing an equation…</span>
+    </div>
+  )
+}
+
 function CopyTex({ source }: { source: string }) {
   const [done, setDone] = useState(false)
   useEffect(() => {

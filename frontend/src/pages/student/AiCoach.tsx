@@ -295,8 +295,8 @@ export default function AiCoach() {
   )
   const boardStrip = !split && mode === "board" && (thinking || lastCoach) && (
     <div className="flex items-start justify-between gap-3 border-t border-[var(--color-border)] bg-white px-4 py-2.5 text-sm" aria-live="polite">
-      <p className={cn("line-clamp-3 min-w-0 whitespace-pre-wrap", thinking ? "text-[var(--color-ink-muted)]" : "text-[var(--color-ink)]")}>
-        <span className="mr-1.5 font-semibold text-[var(--color-teal-dark)]">SocratiQ</span>{thinking ?? lastCoach?.content}
+      <p dir="auto" className={cn("line-clamp-3 min-w-0", thinking ? "text-[var(--color-ink-muted)]" : "text-[var(--color-ink)]")}>
+        <span className="me-1.5 font-semibold text-[var(--color-teal-dark)]">SocratiQ</span>{thinking ?? (lastCoach ? <RichText text={lastCoach.content} compact /> : null)}
       </p>
       {!thinking && lastCoach && <Button type="button" size="sm" variant="secondary" className="shrink-0" onClick={() => setMode("chat")}>Open chat</Button>}
     </div>
@@ -465,6 +465,7 @@ function Bubble({ message, onViewBoard, topic }: { message: Local; onViewBoard: 
         <RichText
           text={message.content}
           detectCode={isStudent}
+          streaming={!isStudent && !final}
           renderCodeBlock={final ? (code, lang, i) => <RunnableCodeBlock code={code} lang={lang} blockKey={`${message.id}:${i}`} /> : undefined}
         />
         {!isStudent && message.boardCount ? (

@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from ai.whiteboard.simulation import BLOCKED_SIM_PATTERNS, MAX_SIM_CHARS, blocked_reasons, has_dynamic_behavior, has_script  # noqa: F401  (re-exported)
 
-MAX_IMAGE_BYTES = 4 * 1024 * 1024
+MAX_IMAGE_BYTES = 12 * 1024 * 1024        # a 2K PNG from the provider; optimize_image() shrinks it before it is returned
 MAX_IMAGE_SIDE = 4096
 MIN_IMAGE_SIDE = 8
 ALLOWED_IMAGE_MIMES = ("image/png", "image/jpeg", "image/webp")
@@ -111,6 +111,35 @@ def validate_image(b64: object, declared_mime: object = None) -> ValidImage:
     except Exception:
         raise MediaRejected("The image service returned corrupted image data.")
     return ValidImage(mime=mime, b64=base64.b64encode(raw).decode("ascii"), width=w, height=h, size=len(raw))
+
+
+OPTIMIZE_ABOVE_BYTES = 1_600_000
+MAX_BOARD_SIDE = 2048
+
+
+def optimize_image(img: ValidImage, max_bytes: int = OPTIMIZE_ABOVE_BYTES, max_side: int = MAX_BOARD_SIDE) -> ValidImage:
+    """Keep generated images board-friendly: downscale anything larger than `max_side` and re-encode large files as high-quality WEBP.
+    Runs only on images that already passed `validate_image`. If re-encoding would not help (or Pillow cannot), the original is returned."""
+    if img.size <= max_bytes and max(img.width, img.height) <= max_side:
+        return img
+    try:
+        from io import BytesIO
+        from PIL import Image
+        with Image.open(BytesIO(base64.b64decode(img.b64))) as im:
+            im.load()
+            if max(im.size) > max_side:
+                im.thumbnail((max_side, max_side), Image.LANCZOS)
+            if im.mode not in ("RGB", "RGBA"):
+                im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
+            out = BytesIO()
+            im.save(out, format="WEBP", quality=90, method=4)
+            data = out.getvalue()
+            w, h = im.size
+        if len(data) >= img.size and max(img.width, img.height) <= max_side:
+            return img
+        return ValidImage(mime="image/webp", b64=base64.b64encode(data).decode("ascii"), width=w, height=h, size=len(data))
+    except Exception:
+        return img
 
 
 # --------------------------------------------------------------------------------------------------------------- simulations
