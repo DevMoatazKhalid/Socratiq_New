@@ -3,16 +3,24 @@ import { SlidersHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 /**
- * Options for AI images on the SmartBoard: what kind of picture, its shape, and its quality. "Auto" lets SocratiQ's image planner decide
- * from the request (a "labelled diagram of the heart" becomes a clean textbook diagram, "a Roman market at dawn" an illustration).
+ * Options for images on the SmartBoard: where the picture comes from, what kind of picture, its shape, and its quality.
+ * Source "Auto" is SocratiQ's visual assistant: it searches trusted, openly licensed libraries first and creates a new image only when nothing
+ * found is accurate enough (or when the request is creative by nature). Style "Auto" lets the planner pick the style.
  * The choice is remembered on this device.
  */
+export type ImageSource = "auto" | "search" | "generate"
 export type ImageStyle = "auto" | "diagram" | "illustration" | "realistic" | "infographic" | "sketch"
 export type ImageAspect = "auto" | "1:1" | "4:3" | "3:4" | "16:9" | "9:16"
 export type ImageQuality = "standard" | "high"
-export interface ImageOptions { style: ImageStyle; aspect: ImageAspect; quality: ImageQuality }
+export interface ImageOptions { source: ImageSource; style: ImageStyle; aspect: ImageAspect; quality: ImageQuality }
 
-export const DEFAULT_IMAGE_OPTIONS: ImageOptions = { style: "auto", aspect: "auto", quality: "standard" }
+export const DEFAULT_IMAGE_OPTIONS: ImageOptions = { source: "auto", style: "auto", aspect: "auto", quality: "standard" }
+
+const SOURCES: { id: ImageSource; label: string; hint: string }[] = [
+  { id: "auto", label: "Smart", hint: "Find a real, licensed image first; create one only if nothing fits" },
+  { id: "search", label: "Real images", hint: "Only existing photos and diagrams, with their source" },
+  { id: "generate", label: "AI-generated", hint: "Always create a new image" },
+]
 
 const STYLES: { id: ImageStyle; label: string; hint: string }[] = [
   { id: "auto", label: "Auto", hint: "SocratiQ picks the best style" },
@@ -35,7 +43,9 @@ const KEY = "socratiq.smartboard.imageOptions"
 export function loadImageOptions(): ImageOptions {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? "null") as Partial<ImageOptions> | null
-    if (v && STYLES.some((s) => s.id === v.style) && ASPECTS.some((a) => a.id === v.aspect) && QUALITIES.some((q) => q.id === v.quality)) return v as ImageOptions
+    if (v && STYLES.some((s) => s.id === v.style) && ASPECTS.some((a) => a.id === v.aspect) && QUALITIES.some((q) => q.id === v.quality)) {
+      return { ...v, source: SOURCES.some((x) => x.id === v.source) ? v.source! : "auto" } as ImageOptions     // options saved before "source" existed
+    }
   } catch { /* storage unavailable: defaults */ }
   return DEFAULT_IMAGE_OPTIONS
 }
@@ -44,9 +54,10 @@ function saveImageOptions(v: ImageOptions) {
 }
 
 export function summarizeImageOptions(v: ImageOptions): string {
-  const s = STYLES.find((x) => x.id === v.style)?.label ?? "Auto"
+  const src = SOURCES.find((x) => x.id === v.source)?.label ?? "Smart"
+  const s = v.style === "auto" ? null : STYLES.find((x) => x.id === v.style)?.label
   const a = v.aspect === "auto" ? null : ASPECTS.find((x) => x.id === v.aspect)?.label
-  return [s, a, v.quality === "high" ? "HD" : null].filter(Boolean).join(" · ")
+  return [src, s, a, v.quality === "high" ? "HD" : null].filter(Boolean).join(" · ")
 }
 
 export function ImageOptionsPicker({ value, onChange, disabled }: { value: ImageOptions; onChange: (v: ImageOptions) => void; disabled?: boolean }) {
@@ -72,7 +83,7 @@ export function ImageOptionsPicker({ value, onChange, disabled }: { value: Image
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((o) => !o)}
-        title="Image style, shape and quality"
+        title="Image source, style, shape and quality"
         className={cn("inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:border-teal-300 hover:bg-teal-50/70 disabled:opacity-50", open && "border-teal-400 bg-teal-50")}
       >
         <SlidersHorizontal className="size-3 text-teal-700" aria-hidden="true" />
@@ -81,6 +92,10 @@ export function ImageOptionsPicker({ value, onChange, disabled }: { value: Image
       {open && (
         <div id={panelId} role="dialog" aria-label="Image options"
           className="absolute bottom-full start-0 z-30 mb-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border border-slate-200 bg-white p-3 text-xs shadow-xl">
+          <Group label="Source">
+            {SOURCES.map((x) => <Chip key={x.id} on={value.source === x.id} title={x.hint} onClick={() => set({ source: x.id })}>{x.label}</Chip>)}
+          </Group>
+          <p className="-mt-1.5 mb-2.5 text-[11px] leading-4 text-slate-500">{SOURCES.find((x) => x.id === value.source)?.hint}.</p>
           <Group label="Style">
             {STYLES.map((s) => <Chip key={s.id} on={value.style === s.id} title={s.hint} onClick={() => set({ style: s.id })}>{s.label}</Chip>)}
           </Group>
@@ -90,7 +105,7 @@ export function ImageOptionsPicker({ value, onChange, disabled }: { value: Image
           <Group label="Quality">
             {QUALITIES.map((q) => <Chip key={q.id} on={value.quality === q.id} title={q.hint} onClick={() => set({ quality: q.id })}>{q.label}</Chip>)}
           </Group>
-          <p className="mt-1 text-[11px] leading-4 text-slate-500">{QUALITIES.find((q) => q.id === value.quality)?.hint}. Labels are written in the language of your request.</p>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">{QUALITIES.find((q) => q.id === value.quality)?.hint} for new images. Style, shape and quality apply to images SocratiQ creates; labels are written in the language of your request.</p>
         </div>
       )}
     </div>

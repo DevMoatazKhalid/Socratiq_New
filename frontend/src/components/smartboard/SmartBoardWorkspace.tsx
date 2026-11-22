@@ -31,7 +31,7 @@ export const localStorageLibraryAdapter = {
     }
   },
 }
-import { generateDiagram, generateImage, generateSimulation, saveScene, type CoachVisual, type GeneratedImage } from "@/lib/queries"
+import { chooseVisualCandidate, generateDiagram, generateSimulation, requestVisual, saveScene, type CoachVisual, type VisualCandidate, type VisualResult } from "@/lib/queries"
 import { ApiError } from "@/lib/api"
 import { createAutosaver, type SaveState } from "@/lib/smartboard/autosave"
 import { planCoachInsertion } from "@/lib/smartboard/coachInsert"
@@ -50,6 +50,7 @@ import { fromServer, type Board, type BoardElement } from "@/lib/whiteboard"
 import { LiveVoicePanel } from "./LiveVoicePanel"
 import { AskSocratiqMenu } from "./AskSocratiqMenu"
 import { ImageOptionsPicker, loadImageOptions, type ImageOptions } from "./ImageOptions"
+import { VISUAL_STAGES, VisualNoMatchCard, VisualProgress, VisualResultCard, visualCaption, type VisualStage } from "./VisualResult"
 import { BoardSimulationLayer } from "./BoardSimulationLayer"
 import { isSimulationCard, type SimulationMap, type SimulationRecord } from "@/lib/smartboard/simulationRef"
 import { sameViewport, type BoardViewport } from "@/lib/smartboard/simulationLayout"
@@ -83,11 +84,15 @@ type AiState =
   | { phase: "working"; step: string; kind?: AiMode; startedAt?: number; quality?: ImageOptions["quality"] }
   | { phase: "done"; message: string; groupId: string; rect: Rect; preview?: string; attribution?: string; retry?: () => Promise<unknown> }
   | { phase: "error"; message: string; detail?: string; retry?: () => Promise<unknown> }
+  // The image assistant: live stages, then the placed image (retrieved or generated) or the "nothing good enough" options
+  | { phase: "visual"; stage: VisualStage; label: string; seen: VisualStage[]; startedAt: number; mode: ImageOptions["source"] }
+  | { phase: "image"; result: VisualResult; groupId: string; rect: Rect; request: string; opts: ImageOptions }
+  | { phase: "image_none"; result: VisualResult; request: string; opts: ImageOptions }
 
 type AiMode = "diagram" | "image" | "simulation"
 const AI_MODES: { id: AiMode; label: string; title: string; Icon: LucideIcon }[] = [
   { id: "diagram", label: "Diagram", title: "AI draws editable vector diagrams on the board", Icon: Workflow },
-  { id: "image", label: "Image", title: "AI generates an illustration, diagram or realistic image", Icon: ImageIcon },
+  { id: "image", label: "Image", title: "SocratiQ finds a real, licensed image or creates one when nothing fits", Icon: ImageIcon },
   { id: "simulation", label: "Simulate", title: "AI creates an interactive simulation", Icon: Play },
 ]
 
@@ -116,11 +121,11 @@ function AiProgress({ step, kind, startedAt }: { step: string; kind?: AiMode; st
 function describeImageError(e: unknown): string {
   if (e instanceof ApiError) {
     if (e.code === "coach_redirect") return e.message
-    if (e.status === 503) return "Image generation isn't set up on the server yet (no image API key is configured)."
-    if (e.status === 504) return "The image took too long to generate. Try again, or choose Standard quality."
-    if (e.status === 429) return "You've generated a lot of images in a short time. Wait a moment, then try again."
+    if (e.status === 503) return e.message && !/^Request failed$/.test(e.message) && !/Gemini API key/i.test(e.message) ? e.message : "Images aren't set up on the server yet (no image API key is configured)."
+    if (e.status === 504) return "The image took too long. Try again, or choose Standard quality."
+    if (e.status === 429) return "You've asked for a lot of images in a short time. Wait a moment, then try again."
     if (e.status === 422) return e.message || "That request can't be turned into an image. Try describing it differently."
-    if (e.status === 0) return "Can't reach the server."
+    if (e.status === 0) return e.code === "network" || e.code === "network_after_save" ? "The connection dropped before the image arrived. Please try again." : "Can't reach the server."
     return e.message || "The image couldn't be generated. Please try again."
   }
   return describeAiError(e)
@@ -488,54 +493,79 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
     } finally { aiBusy.current = false }
   }, [readOnly, scrollTo])
 
-  const runAiImage = useCallback(async (text: string, opts: ImageOptions = imageOpts): Promise<boolean> => {
+  /** Text the student has selected on the board: tells the assistant what the picture is for (the lesson context is added server-side). */
+  const selectionContext = (): string | undefined => {
+    const api = apiRef.current
+    if (!api) return undefined
+    const sel = api.getAppState().selectedElementIds
+    const text = api.getSceneElements().filter((e) => sel[e.id] && e.type === "text").map((e) => (e as { text?: string }).text ?? "").join(" ").replace(/\s+/g, " ").trim()
+    return text ? text.slice(0, 600) : undefined
+  }
+
+  const removeGroup = (groupId: string) => {
+    const api = apiRef.current
+    if (!api) return
+    api.updateScene({ elements: api.getSceneElementsIncludingDeleted().map((e) => (e.groupIds.includes(groupId) && !e.isDeleted ? bump(e, { isDeleted: true }) : e)), captureUpdate: CaptureUpdateAction.IMMEDIATELY })
+  }
+
+  /** Put a retrieved or generated image on the board, with its caption (title + source/licence, or "AI-generated") in the same group. */
+  const placeVisual = (img: Pick<VisualResult, "imageUrl" | "width" | "height" | "title" | "source" | "attribution">, request: string, quality: ImageOptions["quality"]) => {
+    const api = apiRef.current!
+    const plan = planImageInsertion({
+      imageDataUrl: img.imageUrl ?? "",
+      prompt: request,
+      elements: api.getSceneElementsIncludingDeleted(),
+      viewport: currentViewport(),
+      selectedIds: Object.keys(api.getAppState().selectedElementIds),
+      opId: crypto.randomUUID(),
+      naturalWidth: img.width ?? undefined,
+      naturalHeight: img.height ?? undefined,
+      maxSide: quality === "high" ? 520 : 440,
+      caption: visualCaption(img) || undefined,
+    })
+    if (!plan.ok) return plan
+    api.addFiles([plan.file])
+    api.updateScene({
+      elements: plan.all,
+      appState: { selectedElementIds: {}, selectedGroupIds: { [plan.groupId]: true } } as never,
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    })
+    if (!plan.visible) scrollTo(plan.added)
+    return plan
+  }
+
+  /** The image request: SocratiQ decides whether to retrieve an existing image or create one, and reports the real stages as it goes.
+   * `replaceGroupId`: the image this one replaces (Regenerate / "Create an AI image instead"); it is removed only once the new one is ready. */
+  const runAiImage = useCallback(async (text: string, opts: ImageOptions = imageOpts, extra?: { replaceGroupId?: string }): Promise<boolean> => {
     const api = apiRef.current
     const request = text.trim()
     if (!api || !request || aiBusy.current || readOnly) return false
     aiBusy.current = true
     setNotice(null)
     const startedAt = Date.now()
-    const retry = () => runAiImage(request, opts)
-    setAi({ phase: "working", kind: "image", startedAt, quality: opts.quality, step: opts.quality === "high" ? "Planning and generating a high-detail image… usually 20–40 s" : "Planning and generating your image… usually 8–20 s" })
-    const opId = crypto.randomUUID()
+    const retry = () => runAiImage(request, opts, extra)
+    const seen: VisualStage[] = []
+    const stage = (label: string, st: string) => {
+      const s = (VISUAL_STAGES.has(st) ? st : "understanding") as VisualStage
+      if (!seen.includes(s)) seen.push(s)
+      setAi({ phase: "visual", stage: s, label, seen: [...seen], startedAt, mode: opts.source })
+    }
+    stage("Understanding your request…", "understanding")
     try {
-      const img: GeneratedImage = await generateImage(request, { style: opts.style, aspect: opts.aspect, quality: opts.quality }, assignmentId)
-      setAi({ phase: "working", kind: "image", startedAt, step: "Placing it on your board…" })
-      const reference = img.source === "reference"
-      const caption = [img.title, reference && img.attribution ? `Source: ${img.attribution.text}` : null].filter(Boolean).join(" — ")
-      const els = api.getSceneElementsIncludingDeleted()
-      const plan = planImageInsertion({
-        imageDataUrl: img.imageUrl,
-        prompt: request,
-        elements: els,
-        viewport: currentViewport(),
-        selectedIds: Object.keys(api.getAppState().selectedElementIds),
-        opId,
-        naturalWidth: img.width,
-        naturalHeight: img.height,
-        maxSide: opts.quality === "high" ? 520 : 440,
-        caption: caption || undefined,
-      })
+      const result = await requestVisual({ prompt: request, mode: opts.source, style: opts.style, aspect: opts.aspect, quality: opts.quality,
+        context: selectionContext(), assignmentId }, stage)
+      if (result.status !== "ok" || !result.imageUrl) {
+        setAi({ phase: "image_none", result, request, opts })
+        return false
+      }
+      stage("Placing it on your board…", "placing")
+      if (extra?.replaceGroupId) removeGroup(extra.replaceGroupId)
+      const plan = placeVisual(result, request, opts.quality)
       if (!plan.ok) {
         setAi({ phase: "error", message: plan.message, retry })
         return false
       }
-      api.addFiles([plan.file])
-      api.updateScene({
-        elements: plan.all,
-        appState: { selectedElementIds: {}, selectedGroupIds: { [plan.groupId]: true } } as never,
-        captureUpdate: CaptureUpdateAction.IMMEDIATELY,
-      })
-      if (!plan.visible) scrollTo(plan.added)
-      setAi({
-        phase: "done",
-        message: reference
-          ? `No AI image could be made right now, so SocratiQ added a reference image for “${img.title || request}”. Ctrl+Z removes it.`
-          : `Added “${img.title || request}”. Ctrl+Z removes it.`,
-        groupId: plan.groupId, rect: plan.rect, preview: img.imageUrl,
-        attribution: img.attribution ? `${img.attribution.text}${img.attribution.url ? ` · ${img.attribution.url}` : ""}` : undefined,
-        retry,
-      })
+      setAi({ phase: "image", result, groupId: plan.groupId, rect: plan.rect, request, opts })
       setPrompt("")
       return true
     } catch (e) {
@@ -543,6 +573,33 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
       return false
     } finally { aiBusy.current = false }
   }, [readOnly, scrollTo, imageOpts, assignmentId])
+
+  /** Swap in another of the results the assistant found (or use one of the closest results when nothing was good enough). */
+  const [pickingToken, setPickingToken] = useState<string | null>(null)
+  const pickCandidate = async (c: VisualCandidate) => {
+    if (!c.token || aiBusy.current || readOnly || (ai.phase !== "image" && ai.phase !== "image_none")) return
+    const prev = ai
+    aiBusy.current = true
+    setPickingToken(c.token)
+    try {
+      const chosen = await chooseVisualCandidate(c.token, assignmentId)
+      const merged: VisualResult = {
+        ...chosen, status: "ok", kind: c.kind ?? chosen.kind, title: chosen.title || c.title,
+        candidates: prev.result.candidates.map((x) => ({ ...x, selected: x.token === c.token })),
+        decision: { ...prev.result.decision, searched: true, generated: false },
+      }
+      if (prev.phase === "image") removeGroup(prev.groupId)
+      const plan = placeVisual(merged, prev.request, prev.opts.quality)
+      if (!plan.ok) { setNotice(plan.message); return }
+      setAi({ phase: "image", result: merged, groupId: plan.groupId, rect: plan.rect, request: prev.request, opts: prev.opts })
+      setPrompt("")
+    } catch (e) {
+      setNotice(describeImageError(e))
+    } finally {
+      aiBusy.current = false
+      setPickingToken(null)
+    }
+  }
 
   /** The ONE way a simulation gets onto the board (AI generation and the Live Voice tool both end here). Idempotent per simulation id. */
   const insertSimulationCard = useCallback((sim: SimulationRecord): { ok: true } | { ok: false; message: string } => {
@@ -614,14 +671,12 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
   }, [aiMode, runAiDiagram, runAiImage, runAiSimulation])
 
   const removeAiGroup = (groupId: string) => {
-    const api = apiRef.current
-    if (!api) return
-    api.updateScene({ elements: api.getSceneElementsIncludingDeleted().map((e) => (e.groupIds.includes(groupId) && !e.isDeleted ? bump(e, { isDeleted: true }) : e)), captureUpdate: CaptureUpdateAction.IMMEDIATELY })
+    removeGroup(groupId)
     setAi({ phase: "idle" })
   }
   const fit = () => apiRef.current?.scrollToContent(undefined, { fitToContent: true, animate: true, duration: 400, maxZoom: 1 })
   const resetView = () => apiRef.current?.updateScene({ appState: { scrollX: 0, scrollY: 0, zoom: { value: 1 } } as never })
-  const working = ai.phase === "working"
+  const working = ai.phase === "working" || ai.phase === "visual" || pickingToken !== null
   const locked = !!readOnly || busy                       // while the Coach is writing, the board is read-only so nothing it writes can collide with an edit
   // Excalidraw hides its top-right UI in view mode, so while the board is locked (Coach writing, or read-only) the status moves to our own overlay.
   const status = (
@@ -767,6 +822,33 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
           {(ai.phase !== "idle") && (
             <div role={ai.phase === "error" ? "alert" : "status"} aria-live="polite" className={`pointer-events-auto w-full max-w-[960px] rounded-xl border px-3 py-2 text-xs shadow ${ai.phase === "error" ? "border-[var(--color-danger-ink)] bg-white text-[var(--color-danger-ink)]" : "border-[var(--color-line)] bg-white"}`}>
               {ai.phase === "working" && <AiProgress step={ai.step} kind={ai.kind} startedAt={ai.startedAt} />}
+              {ai.phase === "visual" && <VisualProgress stage={ai.stage} label={ai.label} seen={ai.seen} mode={ai.mode} startedAt={ai.startedAt} />}
+              {ai.phase === "image" && (
+                <VisualResultCard
+                  result={ai.result}
+                  busy={working}
+                  busyToken={pickingToken}
+                  onShow={() => { const api = apiRef.current; if (api) scrollTo(api.getSceneElementsIncludingDeleted().filter((e) => e.groupIds.includes(ai.groupId) && !e.isDeleted)) }}
+                  onRemove={() => removeAiGroup(ai.groupId)}
+                  onPick={(c) => void pickCandidate(c)}
+                  onGenerate={() => void runAiImage(ai.request, { ...ai.opts, source: "generate" }, { replaceGroupId: ai.groupId })}
+                  onRegenerate={() => void runAiImage(ai.request, { ...ai.opts, source: "generate" }, { replaceGroupId: ai.groupId })}
+                  onSearch={() => void runAiImage(ai.request, { ...ai.opts, source: "search" }, { replaceGroupId: ai.groupId })}
+                />
+              )}
+              {ai.phase === "image_none" && (
+                <VisualNoMatchCard
+                  result={ai.result}
+                  busy={working}
+                  busyToken={pickingToken}
+                  onPick={(c) => void pickCandidate(c)}
+                  onGenerate={() => void runAiImage(ai.request, { ...ai.opts, source: "generate" })}
+                  onSearch={() => void runAiImage(ai.request, { ...ai.opts, source: "search" })}
+                  onDiagram={() => { setAiMode("diagram"); void runAiDiagram(ai.request) }}
+                  onRephrase={() => { setPrompt(ai.request); setAi({ phase: "idle" }); window.setTimeout(() => document.getElementById("smartboard-ai")?.focus(), 0) }}
+                  onDismiss={() => setAi({ phase: "idle" })}
+                />
+              )}
               {ai.phase === "done" && (
                 <span className="flex flex-wrap items-center gap-2">
                   {ai.preview && <img src={ai.preview} alt="" className="h-10 w-10 shrink-0 rounded-md border border-slate-200 object-cover" />}
@@ -838,7 +920,7 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
                   aiMode === "diagram"
                     ? "Ask AI to draw a diagram… (uses selected items)"
                     : aiMode === "image"
-                    ? "Describe the image: e.g. labelled diagram of a plant cell"
+                    ? "What should we look at? e.g. the Great Pyramid of Giza, a labelled plant cell, a dragon made of clouds"
                     : "Describe a physics, math, or logic simulation to create…"
                 }
                 dir="auto"
@@ -850,7 +932,7 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
                 onClick={() => handleSubmit(prompt)}
                 className="shrink-0 whitespace-nowrap rounded-lg bg-[var(--color-brand,#0f766e)] px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-teal-700 hover:shadow active:scale-[0.97] active:bg-teal-800 disabled:pointer-events-none disabled:opacity-50 @lg/sb:px-3 @lg/sb:py-2 @lg/sb:text-sm"
               >
-                {working ? "Working…" : aiMode === "diagram" ? "Draw" : aiMode === "image" ? "Generate" : "Simulate"}
+                {working ? "Working…" : aiMode === "diagram" ? "Draw" : aiMode === "image" ? (imageOpts.source === "generate" ? "Generate" : imageOpts.source === "search" ? "Search" : "Get image") : "Simulate"}
               </button>
               <button
                 type="button"

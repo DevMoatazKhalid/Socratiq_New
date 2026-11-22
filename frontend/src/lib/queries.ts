@@ -614,6 +614,90 @@ export const generateImage = (prompt: string, opts: ImageRequestOptions = {}, as
     },
   })
 
+/** One search result the visual assistant found and evaluated. `token` is a signed, expiring reference: pass it to `chooseVisualCandidate`. */
+export interface VisualCandidate {
+  token: string | null
+  thumbUrl: string | null
+  title: string
+  provider: string
+  license: string
+  author?: string | null
+  pageUrl?: string | null
+  width?: number
+  height?: number
+  score: number
+  suitable: boolean
+  note?: string
+  selected?: boolean
+  kind?: string | null
+}
+export type VisualSource = "retrieved" | "generated" | "reference"
+export type VisualMode = "auto" | "search" | "generate"
+/** What the visual assistant decided and did (shown in the result card as "why this image"). */
+export interface VisualDecision {
+  mode: VisualMode
+  strategy?: "search" | "generate" | "either"
+  category?: string
+  reason?: string
+  searched: boolean
+  generated: boolean
+  evaluation?: "vision" | "metadata" | ""
+  providers?: string[]
+  queries?: string[]
+  planner?: string
+}
+/** The result of POST /smartboard/image: an image (retrieved with attribution, or AI-generated), or `status: "no_match"` with the closest
+ * results and the next steps the user can take (`alternatives`: "pick" | "generate" | "search" | "rephrase" | "diagram"). */
+export interface VisualResult {
+  status: "ok" | "no_match"
+  imageUrl: string | null
+  mimeType?: string | null
+  width?: number | null
+  height?: number | null
+  source: VisualSource | null
+  aiGenerated: boolean
+  kind?: string | null
+  title: string
+  provider?: string
+  model?: string
+  style?: string
+  aspectRatio?: string
+  attribution?: { text: string; url?: string | null; license?: string | null; licenseUrl?: string | null; author?: string | null; provider?: string } | null
+  message?: string
+  alternatives: string[]
+  candidates: VisualCandidate[]
+  decision: VisualDecision
+}
+export interface VisualRequestBody {
+  prompt: string
+  mode?: VisualMode
+  style?: string
+  aspect?: string
+  quality?: "standard" | "high"
+  /** What the picture is for (e.g. the selected text on the board). The lesson context itself is added by the server. */
+  context?: string
+  /** Tokens of results the user already saw and rejected ("search again" skips them). */
+  exclude?: string[]
+  assignmentId?: string | null
+}
+
+/** The SmartBoard image request: search first, generate when nothing found is good enough. Streams the real stages via `onStage`. */
+export const requestVisual = (body: VisualRequestBody, onStage: (label: string, stage: string) => void, signal?: AbortSignal) =>
+  apiStream<VisualResult>(`/smartboard/image`, {
+    prompt: body.prompt,
+    mode: body.mode ?? "auto",
+    style: body.style ?? "auto",
+    aspect_ratio: body.aspect ?? "auto",
+    quality: body.quality ?? "standard",
+    ...(body.context ? { context: body.context.slice(0, 1200) } : {}),
+    ...(body.exclude?.length ? { exclude: body.exclude.slice(0, 40) } : {}),
+    ...(body.assignmentId ? { assignment_id: body.assignmentId } : {}),
+  }, onStage, signal)
+
+/** Swap in another search result the assistant offered. */
+export const chooseVisualCandidate = (token: string, assignmentId?: string | null) =>
+  api<VisualResult>(`/smartboard/image/candidate`, { method: "POST", body: { token, ...(assignmentId ? { assignment_id: assignmentId } : {}) } })
+
 export const generateSimulation = (prompt: string, title?: string, assignmentId?: string | null, grant?: string | null) =>
   api<{ code: string; coachElementId?: string }>(`/smartboard/generate-simulation`, { method: "POST", body: { prompt, title, ...(assignmentId ? { assignment_id: assignmentId } : {}), ...(grant ? { grant } : {}) } })
 
