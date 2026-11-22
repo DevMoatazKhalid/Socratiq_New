@@ -97,3 +97,9 @@ Backend: `app/routers/ai.py` (refactor + /ai/coach/stream), `app/ai_adapter.py` 
 - Open (honest): real-browser + real-LLM verification; grade distribution; RiskPanel/StudentSections review; misconception/help-seeking summaries; zoom/pan, colour/size, manual sticky notes; dedicated teacher-timeline entry for board actions.
 - Blockers: none in repo; sandbox lacks browser/mic/NVIDIA key/LLM key.
 - DB: unchanged and must remain so (000-013 baselined, 014/015 applied on the user's Supabase; no new migration).
+
+## ASSESSMENT · EXCEL EXPORT · ENCOURAGEMENT · MATHS (2026-11) — IMPLEMENTED, see docs/ASSESSMENT.md
+- DB: migration `020_assessment.sql` (additive, reversible via `down/020_assessment.down.sql`; must be APPLIED on the user's DB). Before it is applied, old 014 grading keeps working and new routes answer 503 `assessment_unavailable` (`grading.ready()`).
+- AI: `ai/grading/` (models, prompts `grading-v1`, engine `reconcile`/`GradingService`). Backend: `app/grading.py` (queue, worker, release, audit), `routers/grading.py`, `exports.py` + `routers/exports.py`, `momentum.py` + `routers/momentum.py`; teacher `set_grade` now rubric/holistic/draft-based.
+- Frontend: `components/teacher/{AssessmentBar,GradePanel,GradingSetup,ExportGradesButton,AssignmentGradingCard}`, `components/student/{GradeResult,MomentumCard,CelebrationHost}`, `lib/{motivation,celebrate,mathText,katex}.ts`, `components/ui/{MathFormula,RichText,Dialog}`.
+- VERIFIED in sandbox: ai grading unit tests, momentum/export unit tests, static schema test, 51 router-level integration checks over Postgres 16, workbook recalculated (0 formula errors), frontend tsc (no errors in touched files), 41 frontend tests in Chromium, UI screenshots at 390/1000/1700 px. UNVERIFIED here: `backend/tests/test_assessment.py` and `database/tests/test_database.py` (need the real test stack), real LLM output quality, vite build/oxlint.

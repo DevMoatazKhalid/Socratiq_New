@@ -18,6 +18,7 @@ import { PersonaSelector } from "@/components/socratiq/PersonaSelector"
 import { ResizableSplit } from "@/components/socratiq/ResizableSplit"
 import { useMediaQuery } from "@/lib/useMediaQuery"
 import { RichText } from "@/components/ui/RichText"
+import { noteStudyActivity } from "@/lib/motivation"
 import { RunnableCodeBlock } from "@/components/socratiq/RunnableCodeBlock"
 import { SaveToNotesButton } from "@/components/notes/SaveToNotesButton"
 import { Clock, Columns2, MessageSquare, Mic, PenLine, Send, Square, Volume2, VolumeX } from "lucide-react"
@@ -144,6 +145,7 @@ export default function AiCoach() {
       }
       if (spoken.current || readAloud) voice.speak(r.message.content)
       else voice.settle()
+      noteStudyActivity()                                            // a long focused session earns a gentle break nudge (see lib/motivation.ts)
     } catch (e) {
       voice.settle()
       if (got > 0) {

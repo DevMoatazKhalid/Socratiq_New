@@ -96,7 +96,7 @@ export function RunnableCodeBlock({ code, lang, blockKey }: { code: string; lang
           <>
             {state.edited ? (
               <button type="button" className={cn(toolBtn, "text-[var(--color-ink-muted)] hover:bg-black/[0.05] hover:text-[var(--color-ink)]")} disabled={isRunning}
-                onClick={() => { update({ source: code, edited: false }); setEditing(false) }} aria-label="Reset to the original code">
+                onClick={() => { update({ source: code, edited: false }) }} aria-label="Reset to the original code">
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />Reset
               </button>
             ) : null}
@@ -105,11 +105,11 @@ export function RunnableCodeBlock({ code, lang, blockKey }: { code: string; lang
               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />{editing ? "Done" : "Edit"}
             </button>
             {isRunning ? (
-              <button type="button" className={cn(toolBtn, "bg-[var(--color-ink)] text-white hover:opacity-90")} onClick={() => void stop()} aria-label="Stop running">
+              <button key="stop" type="button" className={cn(toolBtn, "bg-[var(--color-ink)] text-white hover:opacity-90")} onClick={() => void stop()} aria-label="Stop running">
                 <Square className="h-3 w-3" aria-hidden="true" />Stop
               </button>
             ) : (
-              <button type="button" className={cn(toolBtn, "bg-[var(--color-plum)] text-[var(--color-on-plum)] hover:bg-[var(--color-plum-dark)]")} onClick={() => void run()}
+              <button key="run" type="button" className={cn(toolBtn, "bg-[var(--color-plum)] text-[var(--color-on-plum)] hover:bg-[var(--color-plum-dark)]")} onClick={() => void run()}
                 aria-label={result || state.error ? "Run again" : "Run code"}>
                 <Play className="h-3 w-3" aria-hidden="true" />{result || state.error ? "Run again" : "Run"}
               </button>

@@ -98,7 +98,8 @@ describe("RunnableCodeBlock", () => {
 
   it("Clear output removes the result", async () => {
     render(<RunnableCodeBlock code={"print(1)"} lang="py" blockKey="m1:4" />)
-    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Run code" })) })
+    const run = await screen.findByRole("button", { name: "Run code" })
+    await act(async () => { fireEvent.click(run) })
     await screen.findByLabelText("Program output")
     fireEvent.click(screen.getByRole("button", { name: "Clear output" }))
     expect(screen.queryByLabelText("Program output")).toBeNull()
@@ -108,7 +109,8 @@ describe("RunnableCodeBlock", () => {
   it("shows stderr and the exit code for a failing program", async () => {
     h.reply = (b) => ({ runId: b.run_id, language: "python", status: "failed", exitCode: 1, signal: null, stdout: "", stderr: "ZeroDivisionError: division by zero\n", stdoutTruncated: false, stderrTruncated: false, durationMs: 20, limits: h.runtime.limits })
     render(<RunnableCodeBlock code={"1/0"} lang="py" blockKey="m1:5" />)
-    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Run code" })) })
+    const run = await screen.findByRole("button", { name: "Run code" })
+    await act(async () => { fireEvent.click(run) })
     const out = await screen.findByLabelText("Program output")
     expect(out.querySelector("[data-stream=stderr]")?.textContent).toContain("ZeroDivisionError")
     expect(screen.getByRole("status").textContent).toContain("exit code 1")
@@ -129,7 +131,8 @@ describe("RunnableCodeBlock", () => {
 
   it("keeps the result with its block across a remount (switching views)", async () => {
     const { unmount } = render(<RunnableCodeBlock code={"print(6 * 7)"} lang="py" blockKey="m9:0" />)
-    await act(async () => { fireEvent.click(await screen.findByRole("button", { name: "Run code" })) })
+    const run = await screen.findByRole("button", { name: "Run code" })
+    await act(async () => { fireEvent.click(run) })
     await screen.findByLabelText("Program output")
     unmount()
     render(<RunnableCodeBlock code={"print(6 * 7)"} lang="py" blockKey="m9:0" />)

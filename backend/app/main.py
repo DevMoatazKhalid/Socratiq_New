@@ -21,7 +21,8 @@ from .files.pipeline import FilePipeline
 from .files.storage import LocalObjectStorage, build_storage
 from .files.worker import IngestWorker
 from .code_runner import build_code_service
-from .routers import ai, auth_users, code, files, health, insights, notes, smartboard, student, teacher, verification
+from .grading import GradingQueue, GradingWorker
+from .routers import ai, auth_users, capabilities, code, exports, files, grading, health, insights, momentum, notes, smartboard, student, teacher, verification
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("socratiq")
@@ -71,6 +72,10 @@ def create_app(*, db: Optional[Database] = None, storage: Any = None, token_veri
         from .ai_adapter import build_ai_adapter
         return build_ai_adapter(_db, pipeline.rag)
 
+    # AI grading drafts: the queue lives in Postgres (grade_evaluations); the adapter is looked up per job so tests can swap it.
+    grading_queue = GradingQueue(_db, lambda: app.state.ai, max_attempts=cfg.grading_max_attempts)
+    grading_worker = GradingWorker(grading_queue, cfg.grading_workers, cfg.ingest_poll_seconds, cfg.grading_stale_minutes)
+
     def make_verifier():
         from .auth import SupabaseTokenVerifier
         try:
@@ -85,10 +90,12 @@ def create_app(*, db: Optional[Database] = None, storage: Any = None, token_veri
             _db.open()
         if (cfg.run_worker if run_worker is None else run_worker):
             worker.start()
+            grading_worker.start()
         try:
             yield
         finally:
             worker.stop()
+            grading_worker.stop()
             if db is None:
                 _db.close()
 
@@ -96,6 +103,7 @@ def create_app(*, db: Optional[Database] = None, storage: Any = None, token_veri
                   docs_url=None if cfg.is_production else "/docs", redoc_url=None, openapi_url=None if cfg.is_production else "/openapi.json",
                   description="Send `Authorization: Bearer <supabase access token>` on every endpoint except /health.")
     app.state.db, app.state.storage, app.state.pipeline, app.state.worker = _db, _storage, pipeline, worker
+    app.state.grading, app.state.grading_worker = grading_queue, grading_worker
     app.state.token_verifier = token_verifier or _Lazy(make_verifier)
     app.state.ai = ai_adapter or _Lazy(make_ai)
     app.state.code_service = build_code_service(cfg, code_runner)     # student code runs in the isolated runner service, never in this process
@@ -104,7 +112,7 @@ def create_app(*, db: Optional[Database] = None, storage: Any = None, token_veri
         raise RuntimeError("CORS_ORIGINS must list explicit origins in production")
     app.add_middleware(CORSMiddleware, allow_origins=cfg.cors_origins, allow_origin_regex=cfg.cors_origin_regex,
                        allow_credentials=True, allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-                       allow_headers=["Authorization", "Content-Type", "X-Request-ID"], expose_headers=["X-Request-ID"])
+                       allow_headers=["Authorization", "Content-Type", "X-Request-ID"], expose_headers=["X-Request-ID", "Content-Disposition"])
 
     @app.middleware("http")
     async def guard(request: Request, call_next):
@@ -147,7 +155,8 @@ def create_app(*, db: Optional[Database] = None, storage: Any = None, token_veri
         return _err(request, 500, "Something went wrong on our side.", "internal_error")     # never leak internals
 
     app.include_router(health.router)
-    for r in (auth_users.router, files.router, student.router, notes.router, code.router, verification.router, ai.router, teacher.router, smartboard.router, insights.router):
+    for r in (auth_users.router, capabilities.router, files.router, student.router, notes.router, code.router, verification.router, ai.router, teacher.router, smartboard.router, insights.router,
+              grading.router, exports.router, momentum.router):
         app.include_router(r, prefix="/api/v1")
     return app
 

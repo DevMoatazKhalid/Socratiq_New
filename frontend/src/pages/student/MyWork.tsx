@@ -5,7 +5,7 @@ import { AppShell } from "@/components/layout/AppShell"
 import { PageTitle, Select, StatTile } from "@/components/ds"
 import { GradedTable, UpcomingTable } from "@/components/student/WorkTables"
 import { NoMatches, QueryState, Skeleton } from "@/components/ui/States"
-import { useStudentHome, useStudentOverview } from "@/lib/queries"
+import { useFallbackGrades, useStudentHome, useStudentOverview } from "@/lib/queries"
 import { matches } from "@/lib/search"
 import { byWhatNeedsYou, workRows, type WorkRow } from "@/lib/studentWork"
 
@@ -26,7 +26,8 @@ export default function MyWork() {
   const [status, setStatus] = useState<"open" | "all" | "done">("all")
   const [sort, setSort] = useState<"due" | "late" | "course">("due")
 
-  const rows = useMemo(() => (home.data ? workRows(home.data.assignments, home.data.courses, overview.data) : []), [home.data, overview.data])
+  const fb = useFallbackGrades(home.data?.assignments, overview.data)
+  const rows = useMemo(() => (home.data ? workRows(home.data.assignments, home.data.courses, overview.data, fb.map) : []), [home.data, overview.data, fb.map])
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { all: rows.length, todo: 0, coach: 0, verify: 0, done: 0 }
     rows.forEach((r) => c[r.bucket]++)
@@ -81,11 +82,11 @@ export default function MyWork() {
             </div>
 
             {query.trim() && shown.length === 0 ? (
-              <div className="mt-6"><NoMatches query={query} onClear={() => setQuery("")} /></div>
+              <div className="mt-5"><NoMatches query={query} onClear={() => setQuery("")} /></div>
             ) : (
               <>
-                {(bucket !== "done" && status !== "done") && <div className="mt-6"><UpcomingTable rows={upcoming} empty={rows.length ? "Nothing here with these filters." : undefined} /></div>}
-                {(bucket === "all" || bucket === "done") && status !== "open" && <div className="mt-6"><GradedTable rows={finished} /></div>}
+                {(bucket !== "done" && status !== "done") && <div className="mt-5"><UpcomingTable rows={upcoming} empty={rows.length ? "Nothing here with these filters." : undefined} /></div>}
+                {(bucket === "all" || bucket === "done") && status !== "open" && <div className="mt-5"><GradedTable rows={finished} /></div>}
               </>
             )}
           </>

@@ -127,15 +127,16 @@ class DbHistoryProvider:
 
 
 class AIAdapter:
-    def __init__(self, coach: Any, verification_service: Any, timeout_seconds: int = 90, max_workers: int = 8):
+    def __init__(self, coach: Any, verification_service: Any, timeout_seconds: int = 90, max_workers: int = 8, grading_service: Any = None):
         self.coach, self.verification = coach, verification_service
+        self.grading = grading_service                  # built on first use (see _grading_service), so a Coach-only deployment never loads it
         self.timeout = timeout_seconds
         self._pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="ai")
 
-    def _call(self, fn, *a, **kw):
+    def _call(self, fn, *a, _timeout: Optional[float] = None, **kw):
         fut = self._pool.submit(fn, *a, **kw)
         try:
-            return fut.result(timeout=self.timeout)
+            return fut.result(timeout=_timeout or self.timeout)
         except concurrent.futures.TimeoutError as exc:
             raise AIUnavailable("The AI took too long to respond. Please try again.") from exc
         except AIUnavailable:
@@ -263,6 +264,34 @@ class AIAdapter:
                           criteria=[{"criterion": c.criterion, "passed": c.passed, "feedback": c.feedback} for c in res.criteria_evaluations],
                           evidence=None if ev is None else {"evidence_type": ev.evidence_type.value, "strength": ev.strength.value,
                                                             "observation": ev.observation, "concept": ev.concept})
+
+
+    # ------------------------------------------------------------------ Grading (drafts for instructors; see app/grading.py)
+    def _grading_service(self):
+        if self.grading is None:
+            from ai.grading import GradingService
+            self.grading = GradingService(samples=get_backend_config().grading_samples)
+        return self.grading
+
+    def grade_submission(self, **request) -> dict:
+        """Grade one submission against its rubric. Returns {"result": GradingResult as a dict} or, when the work cannot be graded
+        automatically (nothing readable), {"ungradable": {"code", "message"}}. A model outage raises AIUnavailable: the caller retries
+        later and never records it as a grade."""
+        from ai.grading import GradingRequest, UngradableSubmission
+        svc = self._grading_service()
+        req = GradingRequest(**request)
+
+        def run():
+            try:
+                return {"result": svc.grade(req).model_dump()}
+            except UngradableSubmission as exc:
+                return {"ungradable": {"code": exc.code, "message": exc.message}}
+        return self._call(run, _timeout=self.timeout * max(1, getattr(svc, "samples", 1)))
+
+    def suggest_rubric(self, **kw) -> list[dict]:
+        """A draft rubric (list of {id, title, description, points}) for the instructor to edit. Never saved by this call."""
+        svc = self._grading_service()
+        return [c.model_dump() for c in self._call(svc.suggest_rubric, **kw)]
 
 
 def build_ai_adapter(db: Database, rag: Any) -> AIAdapter:

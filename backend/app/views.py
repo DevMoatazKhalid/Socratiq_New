@@ -34,7 +34,7 @@ def course_view(c: Row, *, teacher_name: str, material_count: int, assignment_co
                 classroom_id: Optional[str] = None, join_code: Optional[str] = None) -> dict[str, Any]:
     out = {"id": c["course_id"], "code": c["code"], "name": c["title"], "description": c.get("description") or "", "teacher": teacher_name,
            "status": "Active" if c["status"] == "ACTIVE" else "Archived", "color": c["color"], "material_count": material_count,
-           "assignment_count": assignment_count, "classroom_id": classroom_id}
+           "assignment_count": assignment_count, "classroom_id": classroom_id, "icon": c.get("icon")}   # icon: migration 021; None = derived from the title
     if student_count is not None:
         out["student_count"] = student_count
     if join_code is not None:
@@ -78,9 +78,16 @@ def grade_view(sub: Optional[Row]) -> Optional[dict[str, Any]]:
     if not sub or sub.get("score") is None:
         return None
     score, mx = float(sub["score"]), float(sub["max_score"])
+    source = sub.get("grade_source") or "manual"
     return {"score": score, "max_score": mx, "percentage": round(score / mx * 100, 1), "feedback": sub.get("feedback"),
             "graded_at": iso(sub.get("graded_at")),
-            "graded_by": " ".join(p for p in (sub.get("g_first"), sub.get("g_last")) if p) or None}
+            "graded_by": " ".join(p for p in (sub.get("g_first"), sub.get("g_last")) if p) or None,
+            # manual | ai (an AI draft released unchanged) | ai_edited (an AI draft the instructor adjusted)
+            "source": source,
+            # False only for an AI grade released automatically (no instructor has looked at it yet); the student is told so
+            "reviewed": source == "manual" or bool(sub.get("graded_by")),
+            # the per-criterion breakdown (title, points, level, optional instructor comment); empty for a holistic grade
+            "criteria": sub.get("grade_criteria") or []}
 
 
 def whiteboard_view(raw: Optional[dict], include_scene: bool = False) -> dict[str, Any]:

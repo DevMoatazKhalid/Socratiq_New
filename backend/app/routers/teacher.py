@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from psycopg import errors as pgerr
 
-from .. import analytics, risk
+from .. import analytics, grading, risk
 from ..access import (default_classroom, teacher_assignment, teacher_classroom, teacher_classrooms, teacher_course, teacher_student)
 from ..auth import CurrentUser, get_db, require_professor
 from ..config import get_backend_config
@@ -52,6 +52,12 @@ FROM courses c WHERE c.university_id = %s AND {scope} ORDER BY c.title"""
 _SCOPE = "(c.instructor_id = %s OR EXISTS (SELECT 1 FROM classrooms k WHERE k.course_id = c.course_id AND k.professor_id = %s))"
 
 
+def has_course_icons(c) -> bool:
+    """True once migration 021 is applied. Until then an icon sent by the client is ignored, never an error."""
+    return bool(one(c, """SELECT EXISTS (SELECT 1 FROM information_schema.columns
+                                          WHERE table_schema = 'public' AND table_name = 'courses' AND column_name = 'icon') AS ok""")["ok"])
+
+
 def _card(r, user: CurrentUser, rooms: Optional[list] = None) -> dict:
     first = rooms[0] if rooms else None
     return course_view(r, teacher_name=user.name, material_count=r["material_count"], assignment_count=r["assignment_count"], student_count=r["student_count"],
@@ -75,8 +81,12 @@ def create_course(body: CourseIn, user: CurrentUser = Depends(require_professor)
     cid, kid = new_id("crs"), new_id("cls")
     try:
         with db.tx() as c:
-            c.execute("INSERT INTO courses (course_id, university_id, instructor_id, code, title, description, color) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                      (cid, user.university_id, user.user_id, body.code, body.title, body.description, body.color))
+            if body.icon and has_course_icons(c):
+                c.execute("INSERT INTO courses (course_id, university_id, instructor_id, code, title, description, color, icon) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                          (cid, user.university_id, user.user_id, body.code, body.title, body.description, body.color, body.icon))
+            else:
+                c.execute("INSERT INTO courses (course_id, university_id, instructor_id, code, title, description, color) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                          (cid, user.university_id, user.user_id, body.code, body.title, body.description, body.color))
             c.execute("INSERT INTO classrooms (classroom_id, course_id, professor_id, name, university_id) VALUES (%s,%s,%s,%s,%s)", (kid, cid, user.user_id, body.section_name, user.university_id))
             row = one(c, _TEACHER_COURSES.format(scope="c.course_id = %s"), (user.university_id, cid))
             return _card(row, user, many(c, "SELECT * FROM classrooms WHERE course_id=%s", (cid,)))
@@ -105,6 +115,8 @@ def patch_course(course_id: str, body: CoursePatch, user: CurrentUser = Depends(
     data = body.model_dump(exclude_none=True)
     with db.tx() as c:
         teacher_course(c, user, course_id, lock=True)
+        if "icon" in data and not has_course_icons(c):
+            data.pop("icon")
         if data:
             sets = ", ".join(f"{k} = %({k})s" for k in data)
             c.execute(f"UPDATE courses SET {sets} WHERE course_id = %(cid)s", {**data, "cid": course_id})
@@ -347,23 +359,34 @@ def _detail(c, user, a) -> dict:
     rows = many(c, """
         SELECT u.user_id, u.first_name, u.last_name, u.email,
                (SELECT t.status FROM attempts t WHERE t.student_id = u.user_id AND t.assignment_id = %(a)s ORDER BY t.attempt_number DESC LIMIT 1) AS attempt_status,
-               (SELECT s.submitted_at FROM submissions s WHERE s.student_id = u.user_id AND s.assignment_id = %(a)s ORDER BY s.submitted_at DESC LIMIT 1) AS submitted_at,
+               last.submitted_at, last.score, last.max_score, last.graded_at,
                (SELECT count(*) FROM verification_runs v WHERE v.student_id = u.user_id AND v.assignment_id = %(a)s AND v.status = 'COMPLETED')::int AS verified,
                (SELECT avg(res.score)::float FROM verification_results res JOIN verification_questions q ON q.question_id = res.question_id JOIN verification_runs v ON v.verification_id = q.verification_id
                  WHERE v.student_id = u.user_id AND v.assignment_id = %(a)s AND res.outcome <> 'INSUFFICIENT_EVIDENCE') AS mastery_score
-          FROM enrollments e JOIN users u ON u.user_id = e.student_id WHERE e.classroom_id = %(k)s AND e.status = 'active' ORDER BY u.last_name NULLS LAST, u.first_name NULLS LAST""",
+          FROM enrollments e JOIN users u ON u.user_id = e.student_id
+          LEFT JOIN LATERAL (SELECT s.submitted_at, s.score, s.max_score, s.graded_at FROM submissions s
+                              WHERE s.student_id = u.user_id AND s.assignment_id = %(a)s ORDER BY s.submitted_at DESC LIMIT 1) last ON true
+         WHERE e.classroom_id = %(k)s AND e.status = 'active' ORDER BY u.last_name NULLS LAST, u.first_name NULLS LAST""",
                 {"a": aid, "k": a["classroom_id"]})
 
     def status(r):
         if r["attempt_status"] == "SUBMITTED":
             return "verified" if r["verified"] else "submitted"
         return "in_progress" if r["attempt_status"] in ("DRAFT", "IN_PROGRESS") else "not_started"
-    subs = [{"student_id": r["user_id"], "student_name": analytics._name(r), "status": status(r), "mastery": mastery_label(r["mastery_score"]), "submitted_at": iso(r["submitted_at"])} for r in rows]
+    def grade(r):
+        """The grade of the LATEST submission (a resubmission is ungraded until graded again), as a percentage of its own maximum."""
+        if r["score"] is None or not r["max_score"]:
+            return None
+        return {"score": float(r["score"]), "max_score": float(r["max_score"]), "percentage": round(float(r["score"]) / float(r["max_score"]) * 100, 1),
+                "graded_at": iso(r["graded_at"])}
+    subs = [{"student_id": r["user_id"], "student_name": analytics._name(r), "status": status(r), "mastery": mastery_label(r["mastery_score"]),
+             "submitted_at": iso(r["submitted_at"]), "grade": grade(r)} for r in rows]
     mats = many(c, "SELECT m.material_id, m.title FROM assignment_materials am JOIN materials m ON m.document_id = am.document_id AND m.course_id = am.course_id WHERE am.assignment_id=%s", (aid,))
     cons = many(c, "SELECT k.name FROM assignment_concepts ac JOIN concepts k ON k.concept_id = ac.concept_id WHERE ac.assignment_id=%s ORDER BY k.name", (aid,))
     return {**assignment_view(a, attachments=attachments_for(c, aid, include_pending=True)), "submissions": subs,
             "linked_materials": [{"id": m["material_id"], "title": m["title"]} for m in mats], "concepts": [k["name"] for k in cons],
-            "counts": {"students": len(subs), "submitted": sum(s["status"] in ("submitted", "verified") for s in subs), "verified": sum(s["status"] == "verified" for s in subs)}}
+            "counts": {"students": len(subs), "submitted": sum(s["status"] in ("submitted", "verified") for s in subs), "verified": sum(s["status"] == "verified" for s in subs),
+                       "graded": sum(1 for s in subs if s["grade"])}}
 
 
 @router.get("/assignments/{assignment_id}")
@@ -487,7 +510,18 @@ def submission_review(assignment_id: str, student_id: str, user: CurrentUser = D
                 "coach_interactions": coach,
                 "signals": [{"label": s["signal"].replace("_", " ").capitalize(), "detail": s["observation"] or "Observed by the AI Coach during a conversation.", "tone": "watch", "at": iso(s["created_at"])} for s in sigs],
                 "signals_note": "Observed patterns only, not a determination of intent.",
-                "risk": risk.assess_one(c, user.university_id, student_id, [assignment_id])}
+                "risk": risk.assess_one(c, user.university_id, student_id, [assignment_id]),
+                # assessment (020): the grading setup, the latest AI draft for THIS submission, and every change to the released grade
+                **_assessment(c, a, sub)}
+
+
+def _assessment(c, a, sub) -> dict:
+    if not grading.ready(c):
+        return {"grading": None, "evaluation": None, "grade_history": []}
+    return {"grading": grading.settings_view(a, include_private=False),
+            "evaluation": grading.evaluation_view(grading.latest_evaluation(c, sub["submission_id"]) if sub else None,
+                                                  current_hash=grading.settings_hash(a), latest_submission_id=sub["submission_id"] if sub else None),
+            "grade_history": grading.grade_history(c, [sub["submission_id"]] if sub else [])}
 
 
 def _gradable_submission(c, user: CurrentUser, assignment_id: str, student_id: str):
@@ -505,12 +539,41 @@ def _gradable_submission(c, user: CurrentUser, assignment_id: str, student_id: s
 
 @router.put("/assignments/{assignment_id}/students/{student_id}/grade")
 def set_grade(assignment_id: str, student_id: str, body: GradeIn, user: CurrentUser = Depends(require_professor), db: Database = Depends(get_db)):
-    if body.score > body.max_score:
-        raise AppError(422, "The score cannot be higher than the maximum score.", "invalid_grade")
+    """Release (or change) the grade the student sees. Holistic or per rubric criterion; optionally based on an AI draft (see GradeIn)."""
     with db.tx() as c:
         sub = _gradable_submission(c, user, assignment_id, student_id)
-        c.execute("UPDATE submissions SET score=%s, max_score=%s, feedback=%s, graded_at=now(), graded_by=%s WHERE submission_id=%s",
-                  (body.score, body.max_score, body.feedback or None, user.user_id, sub["submission_id"]))
+        a = one(c, "SELECT * FROM assignments WHERE assignment_id=%s", (assignment_id,))
+        criteria, points, comments = None, None, None
+        if body.criteria is not None:
+            rubric = grading.rubric_of(a)
+            if not rubric:
+                raise AppError(422, "This assignment has no rubric, so it is graded with one overall score.", "no_rubric")
+            given = {c_.id: c_ for c_ in body.criteria}
+            if set(given) != {r["id"] for r in rubric}:
+                raise AppError(422, "Score every rubric criterion exactly once (the rubric may have changed: reload the page).", "rubric_mismatch")
+            for r in rubric:
+                if given[r["id"]].points > float(r["points"]):
+                    raise AppError(422, f"“{r['title']}” is worth at most {float(r['points']):g} points.", "invalid_grade")
+            points = {k: float(v.points) for k, v in given.items()}
+            comments = {k: v.comment for k, v in given.items() if v.comment}
+            score, max_score = round(sum(points.values()), 4), grading.total_points(a)
+            if body.score is not None and abs(body.score - score) > 1e-6:
+                raise AppError(422, "The score must equal the sum of the criterion points.", "invalid_grade")
+            criteria = grading.student_criteria([{"id": r["id"], "title": r["title"], "points_awarded": points[r["id"]], "points_possible": float(r["points"]),
+                                                  "level": grading.level_for(points[r["id"]], float(r["points"]))} for r in rubric], comments)
+        else:
+            score, max_score = float(body.score), float(body.max_score)
+        if score > max_score:
+            raise AppError(422, "The score cannot be higher than the maximum score.", "invalid_grade")
+        source, evaluation_id = "manual", None
+        if body.evaluation_id:
+            ev = one(c, "SELECT * FROM grade_evaluations WHERE evaluation_id=%s AND submission_id=%s AND status='COMPLETED'", (body.evaluation_id, sub["submission_id"]))
+            if ev is None:
+                raise AppError(409, "That AI draft is no longer available for this submission. Reload the page.", "evaluation_unavailable")
+            evaluation_id = ev["evaluation_id"]
+            source = "ai" if grading.same_as_draft(ev, score=score, feedback=body.feedback, points=points) and not comments else "ai_edited"
+        grading.release(c, sub=sub, actor_id=user.user_id, score=score, max_score=max_score, feedback=body.feedback, criteria=criteria,
+                        source=source, evaluation_id=evaluation_id)
         row = one(c, "SELECT s.*, gu.first_name AS g_first, gu.last_name AS g_last FROM submissions s LEFT JOIN users gu ON gu.user_id=s.graded_by WHERE s.submission_id=%s", (sub["submission_id"],))
         return {"grade": grade_view(row)}
 
@@ -519,5 +582,5 @@ def set_grade(assignment_id: str, student_id: str, body: GradeIn, user: CurrentU
 def clear_grade(assignment_id: str, student_id: str, user: CurrentUser = Depends(require_professor), db: Database = Depends(get_db)):
     with db.tx() as c:
         sub = _gradable_submission(c, user, assignment_id, student_id)
-        c.execute("UPDATE submissions SET score=NULL, max_score=NULL, feedback=NULL, graded_at=NULL, graded_by=NULL WHERE submission_id=%s", (sub["submission_id"],))
+        grading.clear(c, sub=sub, actor_id=user.user_id)
         return {"grade": None}

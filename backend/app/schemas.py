@@ -24,11 +24,16 @@ class ProfileIn(Strict):
 COLORS = ("plum", "slate", "teal", "clay")
 
 
+# Course icons offered on "Create a course" (migration 021 stores the choice). Keep in step with the frontend's COURSE_ICONS.
+CourseIcon = Literal["book", "calculator", "flask", "globe", "code", "music", "palette", "atom", "landmark", "pencil", "laptop", "leaf"]
+
+
 class CourseIn(Strict):
     code: str = Field(min_length=1, max_length=30)
     title: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
     color: Literal["plum", "slate", "teal", "clay"] = "plum"
+    icon: Optional[CourseIcon] = None
     section_name: str = Field(default="Main", min_length=1, max_length=80)
 
 
@@ -36,6 +41,7 @@ class CoursePatch(Strict):
     title: Optional[str] = Field(default=None, min_length=1, max_length=120)
     description: Optional[str] = Field(default=None, max_length=2000)
     color: Optional[Literal["plum", "slate", "teal", "clay"]] = None
+    icon: Optional[CourseIcon] = None
     status: Optional[Literal["ACTIVE", "ARCHIVED"]] = None
 
 
@@ -133,10 +139,74 @@ class SubmitTextIn(Strict):
     text: str = Field(min_length=1, max_length=100000)
 
 
+class CriterionScoreIn(Strict):
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
+    points: float = Field(ge=0, le=10000)
+    comment: Optional[str] = Field(default=None, max_length=1000)
+
+
 class GradeIn(Strict):
-    score: float = Field(ge=0, le=100000)
-    max_score: float = Field(gt=0, le=100000)
+    """Holistic (score + max_score) or rubric-based (criteria: every rubric criterion once; the score is their sum and the maximum is the
+    rubric's total). `evaluation_id` says which AI draft the grade is based on: the server records it as "ai" when nothing was changed and
+    "ai_edited" when the instructor changed the points or the feedback."""
+    score: Optional[float] = Field(default=None, ge=0, le=100000)
+    max_score: Optional[float] = Field(default=None, gt=0, le=100000)
     feedback: Optional[str] = Field(default=None, max_length=4000)
+    criteria: Optional[list[CriterionScoreIn]] = Field(default=None, min_length=1, max_length=25)
+    evaluation_id: Optional[str] = Field(default=None, pattern=r"^gev_[0-9a-f]{32}$")
+
+    @model_validator(mode="after")
+    def _shape(self):
+        if self.criteria is None and (self.score is None or self.max_score is None):
+            raise ValueError("send score and max_score, or a score per rubric criterion")
+        if self.criteria is not None and len({c.id for c in self.criteria}) != len(self.criteria):
+            raise ValueError("each criterion can be scored only once")
+        return self
+
+
+class RubricCriterionIn(Strict):
+    id: str = Field(pattern=r"^[a-z0-9][a-z0-9_-]{0,39}$")
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=1000)
+    points: float = Field(gt=0, le=10000)
+
+
+class GradingSettingsIn(Strict):
+    """Only the fields that are SENT change. Sending a rubric (even unchanged) marks it as reviewed by the instructor."""
+    ai_grading: Optional[Literal["off", "review", "auto_release"]] = None
+    points_possible: Optional[float] = Field(default=None, gt=0, le=100000)
+    rubric: Optional[list[RubricCriterionIn]] = Field(default=None, max_length=25)
+    reference_answer: Optional[str] = Field(default=None, max_length=50000)
+    grading_notes: Optional[str] = Field(default=None, max_length=8000)
+
+    @model_validator(mode="after")
+    def _consistent(self):
+        if not self.model_fields_set:
+            raise ValueError("nothing to update")
+        if self.rubric:
+            if len({c.id for c in self.rubric}) != len(self.rubric):
+                raise ValueError("rubric criterion ids must be unique")
+            total = round(sum(c.points for c in self.rubric), 4)
+            if self.points_possible is not None and abs(self.points_possible - total) > 1e-6:
+                raise ValueError(f"the rubric adds up to {total:g} points, not {self.points_possible:g}")
+        return self
+
+
+class RubricSuggestIn(Strict):
+    points_possible: Optional[float] = Field(default=None, gt=0, le=100000)
+
+
+class GradingRunIn(Strict):
+    student_ids: Optional[list[Annotated[str, StringConstraints(min_length=1, max_length=200)]]] = Field(default=None, max_length=1000)
+    include_graded: bool = False        # also draft for students who already have a released grade (the grade itself is never touched)
+    regrade: bool = False               # draft again even when an up-to-date draft exists
+
+
+class GradingReleaseIn(Strict):
+    """Release AI drafts as grades in bulk. Only up-to-date drafts of ungraded submissions are released; drafts that need review are
+    released only for the students listed explicitly (the instructor has looked at them)."""
+    student_ids: Optional[list[Annotated[str, StringConstraints(min_length=1, max_length=200)]]] = Field(default=None, max_length=1000)
+    min_confidence: float = Field(default=0.0, ge=0, le=1)
 
 
 class CoachIn(Strict):
@@ -256,3 +326,8 @@ class CodeRunIn(StrictRaw):
     language: str = Field(min_length=1, max_length=20, pattern=r"^[a-z0-9+#]+$")
     source: str = Field(min_length=1, max_length=CODE_SOURCE_MAX)
     stdin: str = Field(default="", max_length=CODE_STDIN_MAX)
+
+
+# ---------------------------------------------------------------- study momentum (motivational moments)
+class MomentumSeenIn(Strict):
+    keys: list[Annotated[str, StringConstraints(pattern=r"^[a-z_]{2,40}:[A-Za-z0-9_:.-]{1,120}$")]] = Field(min_length=1, max_length=20)

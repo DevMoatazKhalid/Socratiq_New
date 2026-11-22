@@ -5,7 +5,7 @@ import { AppShell } from "@/components/layout/AppShell"
 import { PageTitle, Section } from "@/components/ds"
 import { GradedTable, UpcomingTable } from "@/components/student/WorkTables"
 import { NoMatches, QueryState } from "@/components/ui/States"
-import { useStudentCourse, useStudentOverview } from "@/lib/queries"
+import { useFallbackGrades, useStudentCourse, useStudentOverview } from "@/lib/queries"
 import { matches } from "@/lib/search"
 import { byWhatNeedsYou, shortDate, workRows } from "@/lib/studentWork"
 
@@ -27,7 +27,8 @@ export default function StudentCourseDetail() {
   const overview = useStudentOverview()
   const [query, setQuery] = useState("")
 
-  const rows = useMemo(() => (q.data ? workRows(q.data.assignments, [q.data.course], overview.data) : []), [q.data, overview.data])
+  const fb = useFallbackGrades(q.data?.assignments, overview.data)
+  const rows = useMemo(() => (q.data ? workRows(q.data.assignments, [q.data.course], overview.data, fb.map) : []), [q.data, overview.data, fb.map])
 
   return (
     <AppShell role="student" crumbs={[{ label: "Courses", to: "/student/courses" }, { label: q.data?.course.name ?? "Course" }]}
@@ -43,6 +44,8 @@ export default function StudentCourseDetail() {
           const resume = rows.filter((r) => r.status === "in_progress").sort(byWhatNeedsYou)[0] ?? rows.filter((r) => r.status === "not_started").sort(byWhatNeedsYou)[0]
           const ov = overview.data?.courses.find((c) => c.courseId === course.id)
           const gradedN = rows.filter((r) => r.grade).length
+          // the overview's figure when the server sends it; otherwise the mean of the grades read from each assignment
+          const avg = ov ? ov.averageGrade : gradedN ? rows.reduce((t, r) => t + (r.grade?.percentage ?? 0), 0) / gradedN : null
           return (
             <>
               <PageTitle title={course.name} subtitle={[course.description, course.teacher].filter(Boolean).join(" · ")}
@@ -57,13 +60,13 @@ export default function StudentCourseDetail() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:max-w-[1032px]">
                     <MiniStat label="Your progress" value={`${verified} of ${rows.length}`} hint="assignments verified" />
                     <MiniStat label="Next due" value={next ? shortDate(next.a.dueDate) : "—"} hint={next ? next.a.title : "Nothing due"} />
-                    <MiniStat label="Course average" value={ov?.averageGrade != null ? `${Math.round(ov.averageGrade)}%` : "—"} hint={gradedN ? `${gradedN} graded` : "No graded work yet"} />
+                    <MiniStat label="Course average" value={avg != null ? `${Math.round(avg)}%` : "—"} hint={gradedN ? `${gradedN} graded` : "No graded work yet"} />
                   </div>
 
-                  <div className="mt-6"><UpcomingTable rows={upcoming} showCourse={false} empty="Nothing to do in this course right now." /></div>
-                  <div className="mt-6"><GradedTable rows={graded} showCourse={false} /></div>
+                  <div className="mt-5"><UpcomingTable rows={upcoming} showCourse={false} empty="Nothing to do in this course right now." /></div>
+                  <div className="mt-5"><GradedTable rows={graded} showCourse={false} /></div>
 
-                  <div className="mt-6">
+                  <div className="mt-5">
                     <Section title="Materials" flush>
                       {mats.length === 0 ? (
                         <p className="px-5 pb-6 text-sm text-[var(--color-ink-muted)]">{materials.length ? "No materials match your search." : "Course readings and slides will show up here once your instructor posts them."}</p>

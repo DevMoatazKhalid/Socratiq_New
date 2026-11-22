@@ -57,7 +57,7 @@ def ids(conn, sql, *params):
 # ------------------------------------------------------------------ deployability / idempotency
 def test_all_migrations_applied_and_tracked(db):
     names = ids(db, "select filename from schema_migrations")
-    assert names[0].startswith("000_") and names[-1].startswith("019_") and len(names) == 20
+    assert names[0].startswith("000_") and names[-1].startswith("021_") and len(names) == 22
 
 
 def _fingerprint(conn):
@@ -387,8 +387,8 @@ def test_valid_file_attachments_are_accepted_on_every_attachment_point(db):
 def _seed_graded_work(db):
     db.execute("UPDATE attempts SET whiteboard = '{\"steps\":[\"x = 7\"],\"strokes\":[]}'::jsonb WHERE attempt_id = 'T1'")
     db.execute("INSERT INTO submissions (submission_id, attempt_id, submission_type, submission_text, university_id, student_id, assignment_id, "
-               "score, max_score, feedback, graded_at, graded_by) "
-               "VALUES ('SUBX', 'T1', 'text', 'theta = theta - lr*grad', 'U1', 'S1', 'A1', 8, 10, 'private feedback', now(), 'P1')")
+               "score, max_score, feedback, graded_at, graded_by, grade_source) "
+               "VALUES ('SUBX', 'T1', 'text', 'theta = theta - lr*grad', 'U1', 'S1', 'A1', 8, 10, 'private feedback', now(), 'P1', 'manual')")
 
 
 def _visible(db, who, sql):
@@ -505,3 +505,23 @@ def test_down_migration_removes_only_the_notes_table_and_018_can_be_reapplied(db
     assert db.execute("SELECT count(*) FROM students").fetchone()[0] == before
     assert dbtools.run_migrations.run(dbtools.url_for(db.info.dbname)) == ["018_student_notes.sql", "019_notes_board.sql"]
     assert db.execute("SELECT count(*) FROM pg_policies WHERE tablename='student_notes'").fetchone()[0] == 4
+
+
+def test_assessment_down_migration_keeps_grades_and_020_can_be_reapplied(db):
+    db.execute((dbtools.run_migrations.MIGRATIONS_DIR / "down" / "020_assessment.down.sql").read_text())
+    for t in ("grade_evaluations", "grade_events", "student_celebrations"):
+        assert db.execute("SELECT to_regclass(%s)", (f"public.{t}",)).fetchone()[0] is None, t
+    cols = ids(db, "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='submissions'")
+    assert "score" in cols and "feedback" in cols and "grade_source" not in cols          # released grades (014) survive
+    assert dbtools.run_migrations.run(dbtools.url_for(db.info.dbname)) == ["020_assessment.sql"]
+    assert db.execute("SELECT count(*) FROM pg_policies WHERE tablename='grade_evaluations'").fetchone()[0] == 1
+
+
+def test_course_icon_is_checked_and_021_can_be_reversed_and_reapplied(db):
+    cid = db.execute("SELECT course_id FROM courses LIMIT 1").fetchone()[0]
+    db.execute("UPDATE courses SET icon = 'flask' WHERE course_id = %s", (cid,))
+    with pytest.raises(E.CheckViolation):
+        db.execute("UPDATE courses SET icon = 'rocket' WHERE course_id = %s", (cid,))           # only the design's icons
+    db.execute((dbtools.run_migrations.MIGRATIONS_DIR / "down" / "021_course_icon.down.sql").read_text())
+    assert "icon" not in ids(db, "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='courses'")
+    assert dbtools.run_migrations.run(dbtools.url_for(db.info.dbname)) == ["021_course_icon.sql"]
