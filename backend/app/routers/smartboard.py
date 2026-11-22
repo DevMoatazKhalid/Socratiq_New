@@ -1,7 +1,9 @@
 """SmartBoard API endpoints.
 Provides real-time AI endpoints matching the SmartBoard reference:
 - /api/v1/smartboard/config: API Key & service readiness
-- /api/v1/smartboard/generate-image: AI Image generation proxy
+- /api/v1/smartboard/image: the visual assistant (search-first: retrieve an existing image or generate one), Server-Sent Events or JSON
+- /api/v1/smartboard/image/candidate: swap in another of the search results the assistant offered (signed reference)
+- /api/v1/smartboard/generate-image: AI Image generation proxy (mode "auto"/"search" routes through the visual assistant)
 - /api/v1/smartboard/generate-simulation: HTML/JS interactive simulation generator
 - /api/v1/smartboard/generate-vector: Structured vector graphics generator (legacy board)
 - /api/v1/smartboard/generate-diagram: Validated, coordinate-free diagram specification for the native board (layout/placement happen client-side)
@@ -36,6 +38,9 @@ from ..db import Database, many, new_id, one
 from ..ratelimit import board_chat_rate_limit, smartboard_rate_limit
 from ..smartboard_media import MediaRejected, extract_simulation_code, validate_image, validate_simulation, validate_vector  # noqa: F401
 from ..image_generation import ASPECTS as IMAGE_ASPECTS, QUALITIES as IMAGE_QUALITIES, STYLES as IMAGE_STYLES, GenerationFailed, ImageRequest, generate_board_image
+from ..image_search import verify_candidate
+from ..visual_assistant import MODES as VISUAL_MODES, EducationalContext, VisualOutcome, VisualRequest, fulfil as fulfil_visual, resolve_candidate
+from fastapi.responses import StreamingResponse
 from ..records import insert_event
 from ai.brain import policy_directive, review_generated_text, review_visual_request
 from ai.brain.visual_gate import review_visual_with_llm
@@ -173,8 +178,18 @@ class ImageGenIn(BaseModel):
     style: Optional[str] = Field(default="auto", max_length=24)
     aspect_ratio: Optional[str] = Field(default="auto", max_length=8)
     quality: Optional[str] = Field(default=None, max_length=16)
+    # "generate" (this endpoint's historical behaviour) | "auto" (search first, generate if nothing suitable) | "search" (existing images only)
+    mode: Optional[str] = Field(default="generate", max_length=12)
     assignment_id: Optional[str] = Field(default=None, max_length=64)
     _v = field_validator("prompt")(_clean_prompt)
+
+    @field_validator("mode")
+    @classmethod
+    def _mode(cls, v):
+        v = (v or "generate").strip().lower()
+        if v not in VISUAL_MODES:
+            raise ValueError(f"mode must be one of {', '.join(VISUAL_MODES)}")
+        return v
 
     @field_validator("style")
     @classmethod
@@ -204,6 +219,24 @@ class ImageGenIn(BaseModel):
 
     def effective_quality(self) -> str:
         return self.quality or ("high" if (self.size or "").upper() in ("2K", "4K") else "standard")
+
+
+class VisualIn(ImageGenIn):
+    """One image request to the visual assistant. `context` is what the picture is for (e.g. the selected board text); `exclude` lists the
+    tokens of results the user already saw and rejected, so "search again" never returns them again."""
+    mode: Optional[str] = Field(default="auto", max_length=12)
+    context: Optional[str] = Field(default=None, max_length=1200)
+    exclude: List[str] = Field(default_factory=list, max_length=40)
+
+    @field_validator("exclude")
+    @classmethod
+    def _exclude(cls, v):
+        return [str(u)[:4000] for u in (v or [])][:40]
+
+
+class CandidateIn(BaseModel):
+    token: str = Field(min_length=10, max_length=4000)
+    assignment_id: Optional[str] = Field(default=None, max_length=64)
 
 
 class SimulationGenIn(BaseModel):
@@ -538,10 +571,158 @@ def _planned_turn(db, g: "RedeemedGrant") -> int:
 @router.post("/generate-image", dependencies=[Depends(smartboard_rate_limit)])
 async def generate_image(request: Request, body: ImageGenIn, user: CurrentUser = Depends(get_current_user)):
     brain = await _gate_visual(request, user, body.assignment_id, "image", body.prompt)
+    if body.mode in ("auto", "search"):                         # e.g. the Live Voice tool: the same search-first assistant, as JSON
+        payload, out = await _run_visual(VisualIn(**body.model_dump()), user, brain)
+        if out.status == "ok":
+            _finish_visual(request, user, brain, "image", body.prompt, _visual_summary(out, body.prompt), None)
+        return payload
     result = await _generate_image_impl(body)
     what = "a reference image (Wikimedia Commons)" if result.get("source") == "reference" else "a generated image"
     _finish_visual(request, user, brain, "image", body.prompt, f"I added {what} to your board: " + (result.get("title") or body.prompt)[:160], None)
     return result
+
+
+# ---------------------------------------------------------------------------------------------------------------------------------------------
+# The visual assistant: one image request, search first (backend/app/visual_assistant.py + image_search.py), generation as the fallback.
+# ---------------------------------------------------------------------------------------------------------------------------------------------
+def _candidate_secret() -> bytes:
+    """Key for the signed search-result references (domain-separated from the Coach element signatures)."""
+    import hashlib
+    import hmac as _hmac
+    try:
+        return _hmac.new(get_backend_config().board_signing_key(), b"socratiq/image-candidates/v1", hashlib.sha256).digest()
+    except Exception as exc:                                   # misconfigured production: results still work, swapping is disabled
+        log.warning("image candidate signing unavailable: %s", exc)
+        return b""
+
+
+def _educational_context(brain: Optional[Brain], note: Optional[str]) -> EducationalContext:
+    """What the lesson is about, from the SAME server-side brain the Coach uses (never from the client), plus the client's note (sanitised DATA)."""
+    a = (brain.assignment if brain else None) or {}
+    hist = (brain.history if brain else None) or []
+    clip = lambda t, n: (" ".join(str(t or "").split()))[:n]
+    recent = tuple(f"{'Student' if m.get('sender') == 'STUDENT' else 'Coach'}: {clip(sanitize_untrusted_text(m.get('content') or ''), 180)}" for m in hist[-4:])
+    course = " ".join(x for x in (a.get("course_title"), f"({a['course_code']})" if a.get("course_code") else "") if x)
+    return EducationalContext(course=clip(course, 120), assignment=clip(a.get("title"), 160),
+                              concepts=tuple(clip(c, 60) for c in (a.get("concepts") or [])[:10] if c), recent=recent,
+                              note=clip(sanitize_untrusted_text(note or ""), 400))
+
+
+def _visual_summary(out: VisualOutcome, prompt: str) -> str:
+    if out.status != "ok":
+        return "I looked for an image but nothing was accurate enough: " + (out.message or prompt)[:200]
+    if out.source == "retrieved":
+        return f"I found an existing image for your board ({(out.attribution or {}).get('text', 'with attribution')}): {out.title[:120]}"
+    if out.source == "reference":
+        return f"I added a reference image (Wikimedia Commons) to your board: {out.title[:120]}"
+    return f"I created an AI-generated image for your board: {out.title[:140]}"
+
+
+async def _run_visual(body: VisualIn, user: CurrentUser, brain: Optional[Brain], emit=None) -> "tuple[dict, VisualOutcome]":
+    key = _get_gemini_key()
+    if not key:
+        raise HTTPException(status_code=503, detail="Gemini API key is not configured")
+    headers = {"x-goog-api-key": key}
+    base = f"{_gemini_http_base()}/models"
+    secret = _candidate_secret()
+    seen = [verify_candidate(t, secret, user.user_id) for t in (getattr(body, "exclude", None) or ())] if secret else []
+    req = VisualRequest(prompt=body.prompt, mode=body.mode or "auto", style=body.style or "auto", aspect=body.aspect_ratio or "auto",
+                        quality=body.effective_quality(), context=_educational_context(brain, getattr(body, "context", None)), user_id=user.user_id,
+                        exclude=tuple(c.full_url for c in seen if c is not None))
+    import httpx
+    async with httpx.AsyncClient(timeout=130.0) as client:
+        try:
+            out = await fulfil_visual(client, base, headers, req, emit) if emit else await fulfil_visual(client, base, headers, req)
+        except GenerationFailed as e:
+            raise HTTPException(status_code=e.status, detail=e.detail)
+    return out.payload(secret), out
+
+
+@router.post("/image", dependencies=[Depends(smartboard_rate_limit)])
+async def visual_request(request: Request, body: VisualIn, user: CurrentUser = Depends(get_current_user)):
+    """The SmartBoard's image request. With `Accept: text/event-stream` it streams `stage` events (understanding, searching, evaluating,
+    retrieving, generating) and then one `final` event with the result; otherwise it returns the result as JSON.
+    The result is either an image (`source`: "retrieved" with attribution, or "generated") or `status: "no_match"` with the closest search
+    results and the available next steps. The same visual policy as every other board AI request applies BEFORE anything is searched."""
+    brain = await _gate_visual(request, user, body.assignment_id, "image", body.prompt)
+
+    async def finish(payload: dict, out: VisualOutcome) -> dict:
+        if out.status == "ok":
+            _finish_visual(request, user, brain, "image", body.prompt, _visual_summary(out, body.prompt), None)
+        return payload
+
+    if "text/event-stream" not in (request.headers.get("accept") or ""):
+        payload, out = await _run_visual(body, user, brain)
+        return await finish(payload, out)
+
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def emit(stage: str, label: str) -> None:
+        await queue.put(("stage", {"stage": stage, "label": label}))
+
+    async def work() -> None:
+        try:
+            payload, out = await _run_visual(body, user, brain, emit)
+            await queue.put(("final", await finish(payload, out)))
+        except HTTPException as e:
+            await queue.put(("error", {"status": e.status_code, "message": str(e.detail), "code": None}))
+        except AppError as e:
+            await queue.put(("error", {"status": e.status_code, "message": e.message, "code": e.code}))
+        except Exception as e:                                 # never leave the client waiting
+            log.exception("visual request failed: %s", type(e).__name__)
+            await queue.put(("error", {"status": 500, "message": "The image request failed. Please try again.", "code": None}))
+        finally:
+            await queue.put(None)
+
+    def sse(event: str, data: dict) -> str:
+        return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+    async def events():
+        task = asyncio.create_task(work())
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(queue.get(), 10.0)
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"                   # generation can be silent for 30 s; keep proxies from closing the stream
+                    continue
+                if item is None:
+                    break
+                yield sse(*item)
+        finally:
+            if not task.done():
+                task.cancel()
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"})
+
+
+@router.post("/image/candidate", dependencies=[Depends(smartboard_rate_limit)])
+async def visual_candidate(request: Request, body: CandidateIn, user: CurrentUser = Depends(get_current_user)):
+    """Use another of the search results the assistant offered. The token is a server-signed, user-bound, expiring reference, so the client can
+    never make the server fetch an arbitrary URL; the image is downloaded from an allow-listed host and validated like every other image."""
+    secret = _candidate_secret()
+    if not secret:
+        raise HTTPException(status_code=503, detail="Choosing another result is not available on this server.")
+    import httpx
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            c, img = await resolve_candidate(client, body.token, secret, user.user_id)
+        except MediaRejected as e:
+            raise HTTPException(status_code=422 if "expired" in str(e) else 502, detail=str(e))
+    if user.is_student and body.assignment_id:
+        db = getattr(request.app.state, "db", None)
+        if db is not None:
+            try:
+                with db.tx() as conn:
+                    brain = load_brain(conn, user, body.assignment_id, channel="board", memory=False)
+                    record_channel_exchange(conn, brain, channel="board_generate", student_text=f"(chose another image: {c.title[:120]})",
+                                            coach_text=f"I swapped in another image ({c.attribution()['text']}).", extra={"visual_kind": "image", "outcome": "created"})
+            except Exception as exc:                          # the transcript note is best-effort; the image itself is valid
+                log.info("could not record the image swap: %s", type(exc).__name__)
+    from ..image_search import PROVIDER_NAMES
+    return {"status": "ok", "imageUrl": img.data_url, "mimeType": img.mime, "width": img.width, "height": img.height, "source": "retrieved",
+            "ai_generated": False, "kind": None, "title": c.title[:90], "provider": c.provider, "model": "search", "attribution": c.attribution(),
+            "candidates": [], "alternatives": [], "message": "", "decision": {"mode": "search", "searched": True, "generated": False}}
 
 
 async def _generate_simulation_impl(body: SimulationGenIn):
