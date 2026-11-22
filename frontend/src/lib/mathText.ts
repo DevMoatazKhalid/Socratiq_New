@@ -14,6 +14,10 @@
 export type MathSegment =
   | { kind: "text"; text: string }
   | { kind: "math"; tex: string; display: boolean; raw: string }
+  /** Only with `{ streaming: true }`: a display formula whose closing delimiter has not arrived yet (rendered as a placeholder, not as half-typed TeX). */
+  | { kind: "pending"; raw: string }
+
+export interface SplitOptions { streaming?: boolean }
 
 const DISPLAY_ENVS = new Set([
   "equation", "equation*", "align", "align*", "aligned", "alignat", "alignat*", "gather", "gather*", "gathered", "multline", "multline*",
@@ -47,7 +51,7 @@ function inlineDollarEnd(s: string, open: number): number {
   return -1
 }
 
-export function splitMath(input: string): MathSegment[] {
+export function splitMath(input: string, opts: SplitOptions = {}): MathSegment[] {
   const out: MathSegment[] = []
   let text = ""
   const flush = () => { if (text) { out.push({ kind: "text", text }); text = "" } }
@@ -62,7 +66,10 @@ export function splitMath(input: string): MathSegment[] {
     if (ch === "\\" && input[i + 1] === "$") { text += "$"; i += 2; continue }
     if (ch === "$" && input[i + 1] === "$" && !escaped(input, i)) {
       const end = findUnescaped(input, "$$", i + 2)
-      if (end === -1) { text += input.slice(i); break }
+      if (end === -1) {
+        if (opts.streaming) { flush(); out.push({ kind: "pending", raw: input.slice(i) }) } else text += input.slice(i)
+        break
+      }
       push(input.slice(i + 2, end), true, input.slice(i, end + 2))
       i = end + 2
       continue
@@ -70,7 +77,10 @@ export function splitMath(input: string): MathSegment[] {
     if (ch === "\\" && (input[i + 1] === "[" || input[i + 1] === "(") && !escaped(input, i)) {
       const display = input[i + 1] === "["
       const end = input.indexOf(display ? "\\]" : "\\)", i + 2)
-      if (end === -1) { text += input.slice(i, i + 2); i += 2; continue }
+      if (end === -1) {
+        if (display && opts.streaming) { flush(); out.push({ kind: "pending", raw: input.slice(i) }); i = input.length; break }
+        text += input.slice(i, i + 2); i += 2; continue
+      }
       push(input.slice(i + 2, end), display, input.slice(i, end + 2))
       i = end + 2
       continue
@@ -88,6 +98,7 @@ export function splitMath(input: string): MathSegment[] {
           i = end + endTag.length
           continue
         }
+        if (opts.streaming) { flush(); out.push({ kind: "pending", raw: input.slice(i) }); i = input.length; break }
       }
     }
     if (ch === "$" && !escaped(input, i)) {
@@ -107,7 +118,125 @@ export function splitMath(input: string): MathSegment[] {
 
 /** True when the text contains at least one complete formula (cheap pre-check for renderers). */
 export function hasMath(text: string): boolean {
-  return /[$\\]/.test(text) && splitMath(text).some((s) => s.kind === "math")
+  return /[$\\\f\x08\t\r]/.test(text) && parseMath(text).some((s) => s.kind === "math")
+}
+
+// ------------------------------------------------------------------ repair & normalisation
+/*
+ * Model output reaches the chat in more shapes than the delimiters above. These run BEFORE splitMath, on prose only (code is split off first):
+ *
+ * 1. repairLatexEscapes: LaTeX written with ONE backslash inside the Coach's JSON reply is decoded into control characters
+ *    (\frac -> FORM FEED + "rac", \right -> CR + "ight", \theta -> TAB + "heta", \beta -> BACKSPACE + "eta", \neq -> LF + "eq").
+ *    KaTeX cannot parse that, so the student saw broken source. The server repairs new replies (ai/guardrails/latex_repair.py); this is the
+ *    same rule set for replies that were stored before the fix.
+ * 2. normalizeMath: double-escaped delimiters (\\[ … \\]), and the bracket form left behind when a Markdown renderer ate the backslashes:
+ *        [                                   ( \frac{a}{b} )
+ *        \left(\frac{d^2y}{dx^2}\right)^4 = y
+ *        ]
+ * 3. promoteBareTex (after splitMath): a line that is nothing but LaTeX, with no delimiters at all, is typeset as a display formula.
+ */
+const T_SUFFIX = "(?:heta|imes|extbf|extit|extrm|extsf|exttt|extstyle|ext|anh|an|au|o|ilde|op|riangle|frac|binom|herefore|ag)(?![A-Za-z])"
+const R_SUFFIX = "(?:ightarrow|ightleftharpoons|ight|ho|angle|ceil|floor|m|Vert|vert|estriction)(?![A-Za-z])"
+// \nabla, \neq … are unambiguous; \ne, \ni, \nu, \not, \neg are short, so they are only repaired after a space/operator (as in "a \neq b"),
+// never at the start of a line where "e^{i\pi}" or "u = 2" may legitimately begin
+const N_LONG = "(?:abla|eq|otin|ewline|exists|mid|leq|geq|parallel|subseteq|Rightarrow|onumber|otag|leftarrow|rightarrow)(?![A-Za-z])"
+const N_SHORT = "(?:e|ot|eg|u|i)(?![A-Za-z])"
+const TAB_RE = new RegExp(`\t(?=${T_SUFFIX})`, "g")
+const CR_RE = new RegExp(`\r(?=${R_SUFFIX})`, "g")
+const LF_RE = new RegExp(`\n(?=${N_LONG})|(?<=[ (\\{=&,+\\-])\n(?=${N_SHORT})`, "g")
+const SPAN_RE = /(\$\$[\s\S]+?\$\$|\\\\?\[[\s\S]+?\\\\?\]|\\\\?\([\s\S]+?\\\\?\)|\\begin\{[A-Za-z*]+\}[\s\S]+?\\end\{[A-Za-z*]+\}|(?<![\\$])\$(?=\S)[^$\n]+?(?<=\S)\$)/g
+
+/** Restore LaTeX that a JSON decoder turned into control characters. Text without those characters is returned unchanged. Prose only. */
+export function repairLatexEscapes(s: string): string {
+  if (!/[\f\b\t\r\n]/.test(s)) return s
+  let t = s.replace(/\f/g, "\\f").replace(/\x08/g, "\\b").replace(TAB_RE, "\\t").replace(CR_RE, "\\r")
+  if (t.includes("\n")) t = t.replace(SPAN_RE, (m) => m.replace(LF_RE, "\\n"))
+  return t
+}
+
+const TEX_CMD = /\\(?:[dt]?frac|sqrt|i?i?int|oint|sum|prod|lim|limsup|liminf|left|right|cdot|times|div|pm|mp|partial|nabla|infty|leq?|geq?|neq?|approx|equiv|sim|propto|alpha|beta|gamma|Gamma|delta|Delta|epsilon|varepsilon|theta|Theta|lambda|Lambda|mu|nu|xi|pi|Pi|rho|sigma|Sigma|tau|phi|Phi|varphi|chi|psi|Psi|omega|Omega|vec|hat|bar|dot|ddot|overline|underline|mathbf|mathrm|mathbb|mathcal|boldsymbol|text|operatorname|begin|log|ln|exp|sin|cos|tan|sec|csc|cot|arcsin|arccos|arctan|sinh|cosh|tanh|to|rightarrow|Rightarrow|leftrightarrow|iff|implies|binom|cdots|ldots|forall|exists|in|notin|subset|subseteq|cup|cap|emptyset|angle|circ|degree|perp|parallel|displaystyle)(?![A-Za-z])/
+const MATH_WORDS = new Set(["max", "min", "det", "lim", "log", "exp", "mod", "gcd", "sup", "inf", "arg", "deg", "dim", "ker"])
+
+/** True when `s` contains LaTeX commands and nothing that reads as prose (no Arabic, no ordinary words). */
+export function isMostlyTex(s: string): boolean {
+  if (!TEX_CMD.test(s) && !/[\^_]\{/.test(s)) return false
+  if (/[؀-ۿ]/.test(s)) return false
+  const rest = s
+    .replace(/\\(?:text|mathrm|operatorname|mathbf|mathit|textbf)\s*\{[^{}]*\}/g, " ")    // \text{…} is allowed to hold words
+    .replace(/\\[A-Za-z]+/g, " ").replace(/\\./g, " ")
+  const words = rest.match(/[A-Za-z]{3,}/g) ?? []
+  return words.every((w) => MATH_WORDS.has(w.toLowerCase()))
+}
+
+/** Rewrites the other ways maths arrives into delimiters splitMath understands. Prose only: code must be split off before. */
+export function normalizeMath(s: string): string {
+  let t = s
+  if (t.includes("\\\\[") || t.includes("\\\\(")) {
+    // double-escaped delimiters (the whole reply was escaped twice); `\\[2pt]` row spacing never has a matching `\\]`, so it is left alone
+    t = t.replace(/\\\\\[([\s\S]+?)\\\\\]/g, (_m, inner: string) => `\\[${halveBackslashes(inner)}\\]`)
+      .replace(/\\\\\(([\s\S]+?)\\\\\)/g, (_m, inner: string) => `\\(${halveBackslashes(inner)}\\)`)
+  }
+  if (t.includes("[")) {
+    // "[" and "]" alone on their own lines around LaTeX, or "[ … ]" filling one line: a display formula whose backslashes were stripped
+    t = t.replace(/^([ \t]*)\[[ \t]*\n([\s\S]+?)\n[ \t]*\][ \t]*$/gm, (m, _ind, inner: string) => (isMostlyTex(inner) ? `$$\n${inner.trim()}\n$$` : m))
+      .replace(/^[ \t]*\[[ \t]+([^\n]+?)[ \t]+\][ \t]*$/gm, (m, inner: string) => (isMostlyTex(inner) ? `$$${inner.trim()}$$` : m))
+  }
+  if (t.includes("( ")) {
+    // "( \frac{a}{b} )" inside a sentence: the inline form of the same damage. Only when the content is unmistakably LaTeX.
+    t = t.replace(/(?<![\\A-Za-z])\(\s+((?:[^()\n]|\([^()\n]*\)){1,160}?)\s+\)/g, (m, inner: string) => (/\\[A-Za-z]/.test(inner) && isMostlyTex(inner) ? `\\(${inner.trim()}\\)` : m))
+  }
+  return t
+}
+
+/** `\\frac` -> `\frac` when the formula was escaped twice (no single-backslash command in it at all). Row breaks `\\\\` become `\\`. */
+function halveBackslashes(tex: string): string {
+  const hasSingle = /(?<!\\)\\[A-Za-z]/.test(tex.replace(/\\\\/g, ""))
+  return hasSingle ? tex : tex.replace(/\\\\/g, "\\")
+}
+
+/** After splitMath: a text line that is nothing but LaTeX (no delimiters) becomes a display formula. */
+export function promoteBareTex(segments: MathSegment[]): MathSegment[] {
+  const out: MathSegment[] = []
+  for (const seg of segments) {
+    if (seg.kind !== "text" || !seg.text.includes("\\")) { out.push(seg); continue }
+    const lines = seg.text.split("\n")
+    let buf: string[] = []
+    const flushText = () => { if (buf.length) { out.push({ kind: "text", text: buf.join("\n") }); buf = [] } }
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim()
+      const last = idx === lines.length - 1
+      if (trimmed.length >= 3 && trimmed.length <= 600 && /\\[A-Za-z]/.test(trimmed) && isMostlyTex(trimmed) && balanced(trimmed)) {
+        if (buf.length) { buf.push(""); flushText() }               // keep the newline that ended the previous text line
+        out.push({ kind: "math", tex: trimmed, display: true, raw: line })
+        if (!last) buf.push("")                                      // ...and the one after the formula (joined back as "\n")
+      } else {
+        buf.push(line)
+      }
+    })
+    flushText()
+  }
+  // merge adjacent text pieces produced above
+  return out.reduce<MathSegment[]>((acc, s) => {
+    const prev = acc[acc.length - 1]
+    if (s.kind === "text" && prev && prev.kind === "text") acc[acc.length - 1] = { kind: "text", text: prev.text + s.text }
+    else acc.push(s)
+    return acc
+  }, [])
+}
+
+function balanced(s: string): boolean {
+  let d = 0
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "\\") { i++; continue }
+    if (s[i] === "{") d++
+    else if (s[i] === "}" && --d < 0) return false
+  }
+  return d === 0
+}
+
+/** The full pipeline the chat uses: repair, normalise, split, promote bare LaTeX lines. */
+export function parseMath(prose: string, opts: SplitOptions = {}): MathSegment[] {
+  return promoteBareTex(splitMath(normalizeMath(repairLatexEscapes(prose)), opts))
 }
 
 // ------------------------------------------------------------------ read-aloud
@@ -142,5 +271,5 @@ export function mathToSpeech(tex: string): string {
 
 /** The whole message with every formula replaced by its spoken form. */
 export function speakMath(text: string): string {
-  return splitMath(text).map((s) => (s.kind === "text" ? s.text : ` ${mathToSpeech(s.tex)} `)).join("")
+  return parseMath(text).map((s) => (s.kind === "math" ? ` ${mathToSpeech(s.tex)} ` : s.kind === "text" ? s.text : "")).join("")
 }

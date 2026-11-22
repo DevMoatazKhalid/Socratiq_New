@@ -45,19 +45,44 @@ function fakeServer({ failTimes = 0, delay = 15 }: { failTimes?: number; delay?:
 
 describe("NotesSync auto-save", () => {
   it("debounces typing and shows Saved only after the server confirmed the text on screen", async () => {
-    const { api, db, calls } = fakeServer()
-    const s = new NotesSync(api, { debounceMs: 30 })
+    let onCreateStarted!: () => void
+    const createStarted = new Promise<void>((r) => { onCreateStarted = r })
+    let resolveCreate!: () => void
+    const createHold = new Promise<void>((r) => { resolveCreate = r })
+
+    let onUpdateStarted!: () => void
+    const updateStarted = new Promise<void>((r) => { onUpdateStarted = r })
+    let resolveUpdate!: () => void
+    const updateHold = new Promise<void>((r) => { resolveUpdate = r })
+
+    const { api, db, calls } = fakeServer({ delay: 0 })
+    const origCreate = api.create
+    api.create = async (b) => {
+      onCreateStarted()
+      await createHold
+      return origCreate(b)
+    }
+    const origUpdate = api.update
+    api.update = async (id, b) => {
+      onUpdateStarted()
+      await updateHold
+      return origUpdate(id, b)
+    }
+
+    const s = new NotesSync(api, { debounceMs: 10 })
     const d = s.createLocal()
     expect(calls).toHaveLength(0)                                   // an empty new note is not created on the server
     s.edit(d.id, { content: "a" })
     s.edit(d.id, { content: "ab" })
     expect(s.draft(d.id)!.state).toBe("pending")
-    await sleep(40)
+    await createStarted
     expect(s.draft(d.id)!.state).toBe("saving")
     s.edit(d.id, { content: "abc" })                                // typed while the first save is in flight
-    await sleep(20)
+    resolveCreate()
+    await updateStarted                                             // second save begins for the new text
     expect(s.draft(d.id)!.state).not.toBe("saved")                  // the confirmed text ("ab") is not what the student sees
-    await sleep(80)
+    resolveUpdate()
+    await s.flush(d.id)
     expect(s.draft(d.id)!.state).toBe("saved")
     expect(db.get(d.id)!.content).toBe("abc")
     expect(calls.map((c) => c[0])).toEqual(["create", "update"])     // coalesced: never one request per keystroke, never two in parallel

@@ -113,3 +113,51 @@ describe("RichText mathematics (AI Coach formulas)", () => {
     expect(container.querySelector("#a")).toBeNull()
   })
 })
+
+describe("RichText: reported equation and learning-content formatting", () => {
+  afterEach(() => { cleanup(); setKatexForTests(null) })
+
+  it("typesets the reported ODE even when the reply arrived with JSON-mangled backslashes", () => {
+    setKatexForTests(katex)
+    const mangled = "Find the order:\n\\[\n\\left(\frac{d^{2}y}{dx^{2}}\right)^{4}=y+\\left(\frac{dy}{dx}\right)^{6}\n\\]"
+    const { container } = render(<RichText text={mangled} />)
+    expect(container.querySelector(".sq-math-display .katex-display")).not.toBeNull()
+    expect(container.querySelector(".sq-math-src")).toBeNull()
+  })
+  it("typesets multi-line derivations written without an environment", () => {
+    setKatexForTests(katex)
+    const { container } = render(<RichText text={"$$ (a+b)^2 &= a^2+2ab+b^2 \\\\ &= 9 $$"} />)
+    expect(container.querySelector(".sq-math-display .katex")).not.toBeNull()
+  })
+  it("renders headings, lists, bold and tables, with maths inside them", () => {
+    setKatexForTests(katex)
+    const { container } = render(<RichText text={"## Steps\n1. Write $f(x)=x^2$\n2. **Differentiate**\n   - check *units*\n\n| x | $x^2$ |\n|---|---|\n| 2 | 4 |"} />)
+    expect(container.querySelector("h2")?.textContent).toBe("Steps")
+    expect(container.querySelectorAll("ol > li").length).toBe(2)
+    expect(container.querySelector("ol li ul li em")?.textContent).toBe("units")
+    expect(container.querySelector("strong")?.textContent).toBe("Differentiate")
+    expect(container.querySelector("table th .katex")).not.toBeNull()
+    expect(container.querySelector("ol li .katex")).not.toBeNull()
+  })
+  it("typesets ```latex fences and keeps Arabic sentences with inline maths in one auto-direction paragraph", () => {
+    setKatexForTests(katex)
+    const { container } = render(<RichText text={"```latex\n\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}\n```\nإذن $x^2 = 4$ ومنه $x = \\pm 2$."} />)
+    expect(container.querySelector("pre")).toBeNull()
+    expect(container.querySelector(".sq-math-display .katex")).not.toBeNull()
+    const p = container.querySelector("p")!
+    expect(p.getAttribute("dir")).toBe("auto")
+    expect(p.querySelectorAll(".sq-math-inline[dir=ltr]").length).toBe(2)
+  })
+  it("shows a placeholder, not half-typed TeX, while a display formula is still streaming", () => {
+    setKatexForTests(katex)
+    const { container } = render(<RichText text={"Let me write it:\n$$\\int_0^"} streaming />)
+    expect(container.querySelector(".sq-math-pending")).not.toBeNull()
+    expect(container.textContent).not.toContain("$$")
+  })
+  it("links only to https/http targets and opens them safely", () => {
+    const { container } = render(<RichText text={"[docs](https://example.org/a) and [bad](javascript:alert(1))"} />)
+    const links = container.querySelectorAll("a")
+    expect(links.length).toBe(1)
+    expect(links[0].getAttribute("rel")).toContain("noopener")
+  })
+})

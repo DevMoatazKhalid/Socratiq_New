@@ -34,7 +34,8 @@ from ..brain import Brain, RedeemedGrant, brain_context_text, load_brain, record
 from ..errors import AppError
 from ..db import Database, many, new_id, one
 from ..ratelimit import board_chat_rate_limit, smartboard_rate_limit
-from ..smartboard_media import MediaRejected, extract_simulation_code, validate_image, validate_simulation, validate_vector
+from ..smartboard_media import MediaRejected, extract_simulation_code, validate_image, validate_simulation, validate_vector  # noqa: F401
+from ..image_generation import ASPECTS as IMAGE_ASPECTS, QUALITIES as IMAGE_QUALITIES, STYLES as IMAGE_STYLES, GenerationFailed, ImageRequest, generate_board_image
 from ..records import insert_event
 from ai.brain import policy_directive, review_generated_text, review_visual_request
 from ai.brain.visual_gate import review_visual_with_llm
@@ -168,9 +169,41 @@ def _clean_prompt(v: str) -> str:
 
 class ImageGenIn(BaseModel):
     prompt: str = Field(max_length=800)
-    size: Optional[str] = Field(default="1K", max_length=32)
+    size: Optional[str] = Field(default="1K", max_length=32)            # legacy: "2K"/"4K" means high quality (Live Voice tool still sends it)
+    style: Optional[str] = Field(default="auto", max_length=24)
+    aspect_ratio: Optional[str] = Field(default="auto", max_length=8)
+    quality: Optional[str] = Field(default=None, max_length=16)
     assignment_id: Optional[str] = Field(default=None, max_length=64)
     _v = field_validator("prompt")(_clean_prompt)
+
+    @field_validator("style")
+    @classmethod
+    def _style(cls, v):
+        v = (v or "auto").strip().lower()
+        if v not in IMAGE_STYLES:
+            raise ValueError(f"style must be one of {', '.join(IMAGE_STYLES)}")
+        return v
+
+    @field_validator("aspect_ratio")
+    @classmethod
+    def _aspect(cls, v):
+        v = (v or "auto").strip()
+        if v not in IMAGE_ASPECTS:
+            raise ValueError(f"aspect_ratio must be one of {', '.join(IMAGE_ASPECTS)}")
+        return v
+
+    @field_validator("quality")
+    @classmethod
+    def _quality(cls, v):
+        if v is None:
+            return None
+        v = v.strip().lower()
+        if v not in IMAGE_QUALITIES:
+            raise ValueError(f"quality must be one of {', '.join(IMAGE_QUALITIES)}")
+        return v
+
+    def effective_quality(self) -> str:
+        return self.quality or ("high" if (self.size or "").upper() in ("2K", "4K") else "standard")
 
 
 class SimulationGenIn(BaseModel):
@@ -436,216 +469,22 @@ def _finish_visual(request: Request, user: CurrentUser, brain: Optional[Brain], 
     with db.tx() as c:
         record_channel_exchange(c, brain, channel="board_generate", student_text=text, coach_text=summary, extra={"visual_kind": kind, "outcome": "created"})
 
-async def _generate_image_impl(body: ImageGenIn):
-    """A REAL generated image or an honest error. There is deliberately no placeholder: a fake image must never be reported as a success."""
+async def _generate_image_impl(body: ImageGenIn) -> dict:
+    """A REAL image or an honest error. There is deliberately no placeholder: a fake image must never be reported as a success.
+    Planning, the model chain, optimisation and the labelled fallbacks live in backend/app/image_generation.py."""
     key = _get_gemini_key()
     if not key:
         raise HTTPException(status_code=503, detail="Gemini API key is not configured")
-
-    # Build an educational-focused prompt for better accuracy
-    edu_prompt = (
-        f"{body.prompt}. "
-        "Educational illustration, clear and accurate diagram, "
-        "clean white background, high detail, professional textbook style."
-    )
     headers = {"x-goog-api-key": key}                       # never in the URL: URLs are logged
     base = f"{_gemini_http_base()}/models"
-    image_model = os.getenv("SMARTBOARD_IMAGE_MODEL", "gemini-2.5-flash-image")
-    import httpx, urllib.parse
-    saw_timeout, rejected = False, None
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        attempts = (
-            (f"{base}/imagen-3.0-generate-002:predict",
-             {"instances": [{"prompt": edu_prompt}], "parameters": {"sampleCount": 1, "aspectRatio": "1:1"}}, "imagen"),
-            (f"{base}/{image_model}:generateContent",
-             {"contents": [{"parts": [{"text": f"Generate a detailed educational visual illustration for: {edu_prompt}"}]}]}, "gemini"),
-        )
-        for url, payload, kind in attempts:
-            try:
-                resp = await client.post(url, json=payload, headers=headers)
-            except httpx.TimeoutException:
-                saw_timeout = True
-                log.warning("Image provider timed out (%s)", kind)
-                continue
-            except Exception as e:                           # network failure: try the next provider
-                log.warning("Image provider unreachable (%s): %s", kind, type(e).__name__)
-                continue
-            if resp.status_code != 200:
-                log.warning("Image provider %s returned status %s", kind, resp.status_code)
-                continue
-            try:
-                data = resp.json()
-                if kind == "imagen":
-                    preds = data.get("predictions") or []
-                    cand = (preds[0].get("bytesBase64Encoded"), preds[0].get("mimeType")) if preds else (None, None)
-                else:
-                    cand = (None, None)
-                    for c in data.get("candidates", []):
-                        for part in (c.get("content") or {}).get("parts", []):
-                            inline = part.get("inlineData") or part.get("inline_data")
-                            if inline and inline.get("data"):
-                                cand = (inline["data"], inline.get("mimeType") or inline.get("mime_type"))
-                                break
-                        if cand[0]:
-                            break
-                if not cand[0]:
-                    continue
-                img = validate_image(cand[0], cand[1])
-                return {"imageUrl": img.data_url, "mimeType": img.mime, "width": img.width, "height": img.height}
-            except MediaRejected as e:
-                rejected = str(e)
-                log.warning("Image from %s rejected: %s", kind, e)
-            except Exception as e:
-                log.warning("Image response from %s unreadable: %s", kind, type(e).__name__)
-
-        # Fallback 1: Authentic Educational Diagrams & Maps (Wikimedia Commons Open Educational Resources)
-        # Returns scientifically and geographically accurate textbook diagrams and maps rendered to high-res PNG (960px).
-        if hasattr(client, "get"):
-            try:
-                # 1. Extract concise modern visual search keywords (e.g. 'Lebanon country map' or 'Heart anatomy diagram')
-                extracted_kw = None
-                try:
-                    flash_url = f"{base}/gemini-3-flash-preview:generateContent"
-                    flash_payload = {
-                        "contents": [{
-                            "parts": [{"text": (
-                                "You are an expert visual search query generator for Wikimedia Commons educational diagrams and maps. "
-                                "Given a user request (which may be in Arabic or English), produce a concise English search phrase that targets the exact official educational diagram, country map, or scientific illustration.\n"
-                                "- If it is a country or region map, specify '[Region] map' (e.g. 'Lebanon map', 'Egypt map').\n"
-                                "- If it is an anatomical diagram, specify 'anatomy diagram' (e.g. 'Heart anatomy diagram').\n"
-                                "- If it is a scientific process or system, specify 'diagram' (e.g. 'Water cycle diagram', 'Plant cell diagram').\n"
-                                f"User request: \"{body.prompt}\"\n"
-                                "Output ONLY the concise search phrase in plain text without quotes:"
-                            )}]
-                        }]
-                    }
-                    flash_resp = await client.post(flash_url, json=flash_payload, headers=headers, timeout=5.0)
-                    if flash_resp.status_code == 200:
-                        parts = flash_resp.json().get("candidates", [{}])[0].get("content", {}).get("parts", [])
-                        if parts and parts[0].get("text"):
-                            raw_t = parts[0]["text"].strip().lower()
-                            clean_t = re.sub(r'[^\w\s]', '', raw_t).strip()
-                            if clean_t:
-                                extracted_kw = clean_t
-                                log.info("Visual search keywords extracted via Gemini Flash: '%s'", extracted_kw)
-                except Exception as e:
-                    log.debug("Gemini flash keyword extraction skipped: %s", e)
-
-                # Fallback keyword extraction via Wikipedia if Gemini was unreachable
-                if not extracted_kw:
-                    clean_term = body.prompt.strip()
-                    if re.search(r'[\u0600-\u06FF]', clean_term):
-                        try:
-                            ar_clean = re.sub(r'[^\u0600-\u06FF\s]', '', clean_term).strip()
-                            for stop in ['صورة', 'رسمة', 'توضيحية', 'مخطط', 'رسم', 'عن', 'في', 'من', 'عايز', 'اريد', 'بدي', 'هات']:
-                                ar_clean = re.sub(rf'\b{stop}\b', '', ar_clean).strip()
-                            if ar_clean:
-                                wp_url = f"https://ar.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch={urllib.parse.quote(ar_clean)}&gsrlimit=1&prop=langlinks&lllang=en&format=json"
-                                wp_r = await client.get(wp_url, headers={"User-Agent": "SocratiQSmartBoard/1.0"}, timeout=4.0)
-                                if wp_r.status_code == 200:
-                                    pages = wp_r.json().get('query', {}).get('pages', {})
-                                    for pid, pdata in pages.items():
-                                        ll = pdata.get('langlinks', [])
-                                        if ll and ll[0].get('*'):
-                                            clean_term = re.sub(r'\(.*?\)', '', ll[0].get('*')).strip()
-                                            break
-                        except Exception as e:
-                            log.debug("Arabic term translation skipped: %s", e)
-                    clean_q = re.sub(r'[^a-zA-Z0-9\s]', ' ', clean_term).strip()
-                    words = [w for w in clean_q.split() if len(w) > 2][:3]
-                    extracted_kw = ' '.join(words)
-
-                words = [w for w in extracted_kw.split() if len(w) > 1]
-                cand_queries = [
-                    extracted_kw,
-                    f"{extracted_kw} map" if "map" not in extracted_kw else extracted_kw,
-                    f"{extracted_kw} diagram" if "diagram" not in extracted_kw and "map" not in extracted_kw else extracted_kw,
-                ]
-
-                def score_wiki_item(pdata, search_words):
-                    title = pdata.get('title', '').lower()
-                    score = 0
-                    for w in search_words:
-                        if w in title:
-                            score += 15
-                    if any(k in title for k in ['map', 'diagram', 'anatomy', 'structure', 'cycle', 'location']):
-                        score += 5
-                    if title.endswith('.svg') or title.endswith('.png'):
-                        score += 3
-                    # Heavily penalize US county/insurance archives, obscure historical items, stamps, explosions, solar/mining maps
-                    if any(bad in title for bad in ['sanborn', 'pennsylvania', 'fire insurance', 'county', 'loc sanborn', 'stamp', 'coin', 'war', 'explosion', 'statistic', 'disputed', 'solar', 'lagerstätten', 'wind']):
-                        score -= 50
-                    if re.search(r'\b(1[6-9]\d\d|century|mandate|vilayet|mutasarrifate)\b', title):
-                        score -= 30
-                    index = pdata.get('index', 99)
-                    return score * 100 - index
-
-                wm_headers = {'User-Agent': 'SocratiQSmartBoard/1.0 (educational app; contact@socratiq.ai)'}
-                for cand_q in cand_queries:
-                    wm_url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={urllib.parse.quote(cand_q)}&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url|mime|size&iiurlwidth=960&format=json"
-                    try:
-                        wm_resp = await client.get(wm_url, headers=wm_headers, timeout=6.0)
-                        if wm_resp.status_code != 200:
-                            continue
-                        pages = wm_resp.json().get('query', {}).get('pages', {})
-                        sorted_pages = sorted(pages.items(), key=lambda x: score_wiki_item(x[1], words), reverse=True)
-                        for pid, pdata in sorted_pages:
-                            title = pdata.get('title', '').lower()
-                            if any(title.endswith(ext) for ext in ['.pdf', '.tif', '.tiff', '.ogg', '.webm', '.audio']):
-                                continue
-                            if any(bad in title for bad in ['icon', 'logo', 'flag', 'signature', 'banner']):
-                                continue
-                            infos = pdata.get('imageinfo') or []
-                            if not infos:
-                                continue
-                            img_dl_url = infos[0].get('thumburl') or infos[0].get('url')
-                            if not img_dl_url:
-                                continue
-
-                            dl_resp = await client.get(img_dl_url, headers=wm_headers, timeout=10.0)
-                            if dl_resp.status_code == 200 and dl_resp.content:
-                                ct = dl_resp.headers.get('content-type', '').split(';')[0].strip()
-                                if not ct or ct == 'application/octet-stream' or 'svg' in ct:
-                                    ct = 'image/png' if '.png' in img_dl_url.lower() else 'image/jpeg'
-                                b64 = base64.b64encode(dl_resp.content).decode('ascii')
-                                img = validate_image(b64, ct)
-                                log.info("Educational visual found via Wikimedia (%s): %dx%d", title, img.width, img.height)
-                                return {"imageUrl": img.data_url, "mimeType": img.mime, "width": img.width, "height": img.height}
-                    except MediaRejected as e:
-                        log.debug("Wikimedia candidate rejected: %s", e)
-                    except Exception as e:
-                        log.debug("Wikimedia search attempt failed (%s): %s", cand_q, e)
-            except Exception as e:
-                log.warning("Wikimedia fallback error: %s", type(e).__name__)
-
-        # Fallback 2: Pollinations AI for generative/creative requests
-        if hasattr(client, "get"):
-            try:
-                clean_p = urllib.parse.quote(edu_prompt.strip())
-                poll_url = f"https://image.pollinations.ai/prompt/{clean_p}?width=800&height=800&nologo=true"
-                resp = await client.get(poll_url, timeout=30.0, follow_redirects=True)
-                if resp.status_code == 200 and resp.content:
-                    ct = resp.headers.get("content-type", "image/jpeg").split(";")[0].strip()
-                    if ct.startswith("image/"):
-                        b64 = base64.b64encode(resp.content).decode("ascii")
-                        img = validate_image(b64, ct)
-                        log.info("Image generated via pollinations (%dx%d)", img.width, img.height)
-                        return {"imageUrl": img.data_url, "mimeType": img.mime, "width": img.width, "height": img.height}
-            except httpx.TimeoutException:
-                saw_timeout = True
-                log.warning("Image provider timed out (pollinations)")
-            except MediaRejected as e:
-                rejected = str(e)
-                log.warning("Image from pollinations rejected: %s", e)
-            except Exception as e:
-                log.warning("Image provider unreachable (pollinations): %s", type(e).__name__)
-
-    if rejected:
-        raise HTTPException(status_code=502, detail=rejected)
-    if saw_timeout:
-        raise HTTPException(status_code=504, detail="The image service took too long. Please try again.")
-    raise HTTPException(status_code=502, detail="The image service could not generate an image right now. Please try again.")
-
+    req = ImageRequest(prompt=body.prompt, style=body.style or "auto", aspect=body.aspect_ratio or "auto", quality=body.effective_quality())
+    import httpx
+    async with httpx.AsyncClient(timeout=130.0) as client:
+        try:
+            result = await generate_board_image(client, base, headers, req)
+        except GenerationFailed as e:
+            raise HTTPException(status_code=e.status, detail=e.detail)
+    return result.payload()
 
 
 async def _generate_granted(request: Request, user: CurrentUser, body, kind: str, impl) -> dict:
@@ -700,7 +539,8 @@ def _planned_turn(db, g: "RedeemedGrant") -> int:
 async def generate_image(request: Request, body: ImageGenIn, user: CurrentUser = Depends(get_current_user)):
     brain = await _gate_visual(request, user, body.assignment_id, "image", body.prompt)
     result = await _generate_image_impl(body)
-    _finish_visual(request, user, brain, "image", body.prompt, "I added a generated image to your board: " + body.prompt[:160], None)
+    what = "a reference image (Wikimedia Commons)" if result.get("source") == "reference" else "a generated image"
+    _finish_visual(request, user, brain, "image", body.prompt, f"I added {what} to your board: " + (result.get("title") or body.prompt)[:160], None)
     return result
 
 

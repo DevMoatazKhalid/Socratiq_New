@@ -12,6 +12,7 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+from ai.guardrails.latex_repair import repair_board_actions, repair_latex_escapes, repair_latex_in
 from ai.models.schemas import DiagnosisCategory, InterventionType
 
 
@@ -50,16 +51,23 @@ class GeneratedResponse(BaseModel):
     # malformed optional field must never fail the turn; `ai.brain.visual_plan.parse_visual_plan` validates it strictly.
     visual_plan: Optional[dict[str, Any]] = None
 
+    # LaTeX written with single backslashes inside the JSON string arrives with \frac -> form feed, \right -> carriage return, ... and would
+    # show as broken source instead of typeset maths. Repaired here, the one place every structured reply passes (see ai.guardrails.latex_repair).
+    @field_validator("response", mode="before")
+    @classmethod
+    def _repair_math(cls, v):
+        return repair_latex_escapes(v)
+
     @field_validator("visual_plan", mode="before")
     @classmethod
     def _tolerate_junk_plan(cls, v):
-        return v if isinstance(v, dict) else None
+        return repair_latex_in(v) if isinstance(v, dict) else None
 
     @field_validator("board_actions", mode="before")
     @classmethod
     def _tolerate_junk(cls, v):
         """The reply must reach the student even if the model emits garbage for the OPTIONAL board field: non-list -> none, non-object items dropped."""
-        return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
+        return repair_board_actions([x for x in v if isinstance(x, dict)]) if isinstance(v, list) else []
 
 
 class ValidationResult(BaseModel):
@@ -71,3 +79,8 @@ class ValidationResult(BaseModel):
         default=None,
         description="A corrected response, only if `passes` is False and a safe fix exists.",
     )
+
+    @field_validator("revised_response", mode="before")
+    @classmethod
+    def _repair_math(cls, v):
+        return repair_latex_escapes(v)

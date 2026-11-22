@@ -4,7 +4,7 @@ import { CaptureUpdateAction, Excalidraw, MainMenu, WelcomeScreen, useHandleLibr
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types"
 import type { AppState, BinaryFileData, ExcalidrawImperativeAPI, LibraryItems } from "@excalidraw/excalidraw/types"
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react"
-import { Mic, Image as ImageIcon, Play, Sparkles, ChevronDown, Maximize, Minimize } from "lucide-react"
+import { Mic, Image as ImageIcon, Play, Maximize, Minimize, Workflow, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export const SMARTBOARD_LIBRARY_STORAGE_KEY = "socratiq_smartboard_library_items"
@@ -31,7 +31,8 @@ export const localStorageLibraryAdapter = {
     }
   },
 }
-import { generateDiagram, generateImage, generateSimulation, saveScene, type CoachVisual } from "@/lib/queries"
+import { generateDiagram, generateImage, generateSimulation, saveScene, type CoachVisual, type GeneratedImage } from "@/lib/queries"
+import { ApiError } from "@/lib/api"
 import { createAutosaver, type SaveState } from "@/lib/smartboard/autosave"
 import { planCoachInsertion } from "@/lib/smartboard/coachInsert"
 import { parseDiagramSpec } from "@/lib/smartboard/diagramSpec"
@@ -44,9 +45,11 @@ import { readMeta, withMeta } from "@/lib/smartboard/meta"
 import { viewportRect } from "@/lib/smartboard/placement"
 import { browserImageCompressor, buildStoredScene, compressSceneFiles, isStoredScene, restoreStoredScene, sceneBytes, SCENE_MAX_BYTES } from "@/lib/smartboard/scene"
 import type { Rect, SceneEl } from "@/lib/smartboard/types"
-import { ASK_ACTIONS, type BoardIntent } from "@/lib/boardAsk"
+import type { BoardIntent } from "@/lib/boardAsk"
 import { fromServer, type Board, type BoardElement } from "@/lib/whiteboard"
 import { LiveVoicePanel } from "./LiveVoicePanel"
+import { AskSocratiqMenu } from "./AskSocratiqMenu"
+import { ImageOptionsPicker, loadImageOptions, type ImageOptions } from "./ImageOptions"
 import { BoardSimulationLayer } from "./BoardSimulationLayer"
 import { isSimulationCard, type SimulationMap, type SimulationRecord } from "@/lib/smartboard/simulationRef"
 import { sameViewport, type BoardViewport } from "@/lib/smartboard/simulationLayout"
@@ -77,11 +80,51 @@ interface Props {
 type Els = readonly ExcalidrawElement[]
 type AiState =
   | { phase: "idle" }
-  | { phase: "working"; step: string }
-  | { phase: "done"; message: string; groupId: string; rect: Rect }
-  | { phase: "error"; message: string; detail?: string }
+  | { phase: "working"; step: string; kind?: AiMode; startedAt?: number; quality?: ImageOptions["quality"] }
+  | { phase: "done"; message: string; groupId: string; rect: Rect; preview?: string; attribution?: string; retry?: () => Promise<unknown> }
+  | { phase: "error"; message: string; detail?: string; retry?: () => Promise<unknown> }
 
 type AiMode = "diagram" | "image" | "simulation"
+const AI_MODES: { id: AiMode; label: string; title: string; Icon: LucideIcon }[] = [
+  { id: "diagram", label: "Diagram", title: "AI draws editable vector diagrams on the board", Icon: Workflow },
+  { id: "image", label: "Image", title: "AI generates an illustration, diagram or realistic image", Icon: ImageIcon },
+  { id: "simulation", label: "Simulate", title: "AI creates an interactive simulation", Icon: Play },
+]
+
+/** Live progress for a running AI request: the current stage, an honest time estimate and the elapsed seconds (image generation takes a while). */
+function AiProgress({ step, kind, startedAt }: { step: string; kind?: AiMode; startedAt?: number }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!startedAt) return
+    const t = window.setInterval(() => setNow(Date.now()), 500)
+    return () => window.clearInterval(t)
+  }, [startedAt])
+  const secs = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : 0
+  return (
+    <span className="flex flex-col gap-1.5">
+      <span className="flex items-center gap-2">
+        <span className="relative flex size-2 shrink-0"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-75" /><span className="relative inline-flex size-2 rounded-full bg-teal-600" /></span>
+        <span className="min-w-0 flex-1">{step}</span>
+        {startedAt ? <span className="tabular-nums text-[var(--color-ink-muted)]">{secs}s</span> : null}
+      </span>
+      {kind === "image" && <span aria-hidden className="sq-progress-track"><span className="sq-progress-bar" /></span>}
+    </span>
+  )
+}
+
+/** Human, specific messages for image failures (the generic "drawing assistant failed" said nothing useful). */
+function describeImageError(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.code === "coach_redirect") return e.message
+    if (e.status === 503) return "Image generation isn't set up on the server yet (no image API key is configured)."
+    if (e.status === 504) return "The image took too long to generate. Try again, or choose Standard quality."
+    if (e.status === 429) return "You've generated a lot of images in a short time. Wait a moment, then try again."
+    if (e.status === 422) return e.message || "That request can't be turned into an image. Try describing it differently."
+    if (e.status === 0) return "Can't reach the server."
+    return e.message || "The image couldn't be generated. Please try again."
+  }
+  return describeAiError(e)
+}
 
 function buildInit(initial: Board) {
   if (initial.scene && isStoredScene(initial.scene)) {
@@ -171,6 +214,7 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
   const [hasContent, setHasContent] = useState(init.elements.some((e) => !e.isDeleted))
   const [ai, setAi] = useState<AiState>({ phase: "idle" })
   const [aiMode, setAiMode] = useState<AiMode>("diagram")
+  const [imageOpts, setImageOpts] = useState<ImageOptions>(() => loadImageOptions())
   const [prompt, setPrompt] = useState("")
   const [notice, setNotice] = useState<string | null>(init.report?.warnings.length ? `Your board was upgraded to the new whiteboard. ${init.report.warnings.slice(0, 2).join(" ")}` : null)
   const [showLiveVoice, setShowLiveVoice] = useState(false)
@@ -444,29 +488,37 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
     } finally { aiBusy.current = false }
   }, [readOnly, scrollTo])
 
-  const runAiImage = useCallback(async (text: string) => {
+  const runAiImage = useCallback(async (text: string, opts: ImageOptions = imageOpts): Promise<boolean> => {
     const api = apiRef.current
     const request = text.trim()
-    if (!api || !request || aiBusy.current || readOnly) return
+    if (!api || !request || aiBusy.current || readOnly) return false
     aiBusy.current = true
     setNotice(null)
-    setAi({ phase: "working", step: "Generating illustration with AI…" })
+    const startedAt = Date.now()
+    const retry = () => runAiImage(request, opts)
+    setAi({ phase: "working", kind: "image", startedAt, quality: opts.quality, step: opts.quality === "high" ? "Planning and generating a high-detail image… usually 20–40 s" : "Planning and generating your image… usually 8–20 s" })
     const opId = crypto.randomUUID()
     try {
-      const { imageUrl } = await generateImage(request, "1K", assignmentId)
-      setAi({ phase: "working", step: "Finding space on your board…" })
+      const img: GeneratedImage = await generateImage(request, { style: opts.style, aspect: opts.aspect, quality: opts.quality }, assignmentId)
+      setAi({ phase: "working", kind: "image", startedAt, step: "Placing it on your board…" })
+      const reference = img.source === "reference"
+      const caption = [img.title, reference && img.attribution ? `Source: ${img.attribution.text}` : null].filter(Boolean).join(" — ")
       const els = api.getSceneElementsIncludingDeleted()
       const plan = planImageInsertion({
-        imageDataUrl: imageUrl,
+        imageDataUrl: img.imageUrl,
         prompt: request,
         elements: els,
         viewport: currentViewport(),
         selectedIds: Object.keys(api.getAppState().selectedElementIds),
         opId,
+        naturalWidth: img.width,
+        naturalHeight: img.height,
+        maxSide: opts.quality === "high" ? 520 : 440,
+        caption: caption || undefined,
       })
       if (!plan.ok) {
-        setAi({ phase: "error", message: plan.message })
-        return
+        setAi({ phase: "error", message: plan.message, retry })
+        return false
       }
       api.addFiles([plan.file])
       api.updateScene({
@@ -475,12 +527,22 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       })
       if (!plan.visible) scrollTo(plan.added)
-      setAi({ phase: "done", message: `Added image for “${request}”. Ctrl+Z removes it.`, groupId: plan.groupId, rect: plan.rect })
+      setAi({
+        phase: "done",
+        message: reference
+          ? `No AI image could be made right now, so SocratiQ added a reference image for “${img.title || request}”. Ctrl+Z removes it.`
+          : `Added “${img.title || request}”. Ctrl+Z removes it.`,
+        groupId: plan.groupId, rect: plan.rect, preview: img.imageUrl,
+        attribution: img.attribution ? `${img.attribution.text}${img.attribution.url ? ` · ${img.attribution.url}` : ""}` : undefined,
+        retry,
+      })
       setPrompt("")
+      return true
     } catch (e) {
-      setAi({ phase: "error", message: describeAiError(e) })
+      setAi({ phase: "error", message: describeImageError(e), retry })
+      return false
     } finally { aiBusy.current = false }
-  }, [readOnly, scrollTo])
+  }, [readOnly, scrollTo, imageOpts, assignmentId])
 
   /** The ONE way a simulation gets onto the board (AI generation and the Live Voice tool both end here). Idempotent per simulation id. */
   const insertSimulationCard = useCallback((sim: SimulationRecord): { ok: true } | { ok: false; message: string } => {
@@ -576,7 +638,7 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
   return (
     <div
       ref={containerRef}
-      className={cn("relative h-full min-h-[320px] w-full bg-white", isCssFullscreen && "fixed inset-0 z-50 h-screen w-screen")}
+      className={cn("@container/sb relative h-full min-h-[320px] w-full bg-white", isCssFullscreen && "fixed inset-0 z-50 h-screen w-screen")}
       data-testid="smartboard"
     >
       <Excalidraw
@@ -699,112 +761,107 @@ export const SmartBoardWorkspace = forwardRef<BoardApi, Props>(function SmartBoa
       )}
 
       {!readOnly && (
-        <div className="pointer-events-none absolute bottom-16 left-1/2 z-10 flex w-[min(960px,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2 md:bottom-3 md:left-[15.5rem] md:right-16 md:mx-auto md:w-auto md:max-w-[960px] md:translate-x-0">
+        // Sized by the BOARD's own width (container queries), not the window: in the split view the board can be narrow on a wide screen.
+        // The bar wraps instead of scrolling sideways, so nothing in it is ever pushed out of view, and nothing in it clips the menus above it.
+        <div className="pointer-events-none absolute inset-x-2 bottom-16 z-10 flex flex-col items-center gap-2 @3xl/sb:bottom-3 @3xl/sb:left-[15.5rem] @3xl/sb:right-16">
           {(ai.phase !== "idle") && (
-            <div role={ai.phase === "error" ? "alert" : "status"} aria-live="polite" className={`pointer-events-auto rounded-lg border px-3 py-2 text-xs shadow ${ai.phase === "error" ? "border-[var(--color-danger-ink)] bg-white text-[var(--color-danger-ink)]" : "border-[var(--color-line)] bg-white"}`}>
-              {ai.phase === "working" && <span>{ai.step}</span>}
+            <div role={ai.phase === "error" ? "alert" : "status"} aria-live="polite" className={`pointer-events-auto w-full max-w-[960px] rounded-xl border px-3 py-2 text-xs shadow ${ai.phase === "error" ? "border-[var(--color-danger-ink)] bg-white text-[var(--color-danger-ink)]" : "border-[var(--color-line)] bg-white"}`}>
+              {ai.phase === "working" && <AiProgress step={ai.step} kind={ai.kind} startedAt={ai.startedAt} />}
               {ai.phase === "done" && (
                 <span className="flex flex-wrap items-center gap-2">
-                  <span>{ai.message}</span>
+                  {ai.preview && <img src={ai.preview} alt="" className="h-10 w-10 shrink-0 rounded-md border border-slate-200 object-cover" />}
+                  <span className="min-w-0 flex-1">
+                    <span className="block">{ai.message}</span>
+                    {ai.attribution && <span className="block text-[11px] text-[var(--color-ink-muted)]">{ai.attribution}</span>}
+                  </span>
                   <button type="button" className="underline" onClick={() => { const api = apiRef.current; if (api) scrollTo(api.getSceneElementsIncludingDeleted().filter((e) => e.groupIds.includes(ai.groupId))) }}>Show</button>
+                  {ai.retry && <button type="button" className="underline" disabled={working} onClick={() => { removeAiGroup(ai.groupId); void ai.retry?.() }}>Regenerate</button>}
                   <button type="button" className="underline" onClick={() => removeAiGroup(ai.groupId)}>Remove</button>
                 </span>
               )}
-              {ai.phase === "error" && <span>{ai.message}{ai.detail && <details className="mt-1 text-[var(--color-ink-muted)]"><summary className="cursor-pointer">Details</summary><pre className="whitespace-pre-wrap">{ai.detail}</pre></details>}</span>}
+              {ai.phase === "error" && (
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-0 flex-1">{ai.message}{ai.detail && <details className="mt-1 text-[var(--color-ink-muted)]"><summary className="cursor-pointer">Details</summary><pre className="whitespace-pre-wrap">{ai.detail}</pre></details>}</span>
+                  {ai.retry && <button type="button" className="underline" onClick={() => void ai.retry?.()}>Try again</button>}
+                  <button type="button" className="underline" onClick={() => setAi({ phase: "idle" })}>Dismiss</button>
+                </span>
+              )}
             </div>
           )}
-          <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1.5 sm:p-2 shadow-lg backdrop-blur-sm overflow-x-auto thin-scroll max-w-full">
-            {/* Mode Selector Toggle */}
-            <div className="flex items-center shrink-0 rounded-lg border border-slate-200 bg-slate-100/90 p-0.5 text-xs font-medium overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setAiMode("diagram")}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                  aiMode === "diagram"
-                    ? "bg-white text-teal-800 shadow-sm border border-slate-200/60 font-semibold"
-                    : "text-slate-600 hover:text-teal-900 hover:bg-white/80 active:bg-teal-50/70"
-                }`}
-                title="AI draws vector diagrams on the board"
-              >
-                Diagram
-              </button>
-              <button
-                type="button"
-                onClick={() => setAiMode("image")}
-                className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                  aiMode === "image"
-                    ? "bg-white text-teal-800 shadow-sm border border-slate-200/60 font-semibold"
-                    : "text-slate-600 hover:text-teal-900 hover:bg-white/80 active:bg-teal-50/70"
-                }`}
-                title="AI generates illustrations and images"
-              >
-                <ImageIcon className="size-3" />
-                <span>Image</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setAiMode("simulation")}
-                className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                  aiMode === "simulation"
-                    ? "bg-white text-teal-800 shadow-sm border border-slate-200/60 font-semibold"
-                    : "text-slate-600 hover:text-teal-900 hover:bg-white/80 active:bg-teal-50/70"
-                }`}
-                title="AI creates interactive HTML/JS simulations"
-              >
-                <Play className="size-3" />
-                <span>Simulate</span>
-              </button>
-            </div>
-
-            <label className="sr-only" htmlFor="smartboard-ai">Ask the AI to draw or explain on your board</label>
-            <input
-              id="smartboard-ai"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              disabled={working}
-              maxLength={1000}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  e.preventDefault()
-                  handleSubmit(prompt)
-                }
-              }}
-              placeholder={
-                aiMode === "diagram"
-                  ? "Ask AI to draw a diagram… (uses selected items)"
-                  : aiMode === "image"
-                  ? "Describe an image or visual illustration to generate…"
-                  : "Describe a physics, math, or logic simulation to create…"
-              }
-              dir="auto"
-              className="min-w-[8rem] sm:min-w-[10rem] flex-1 rounded-lg border border-slate-200 bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm text-slate-800 outline-none hover:border-slate-300 focus:border-teal-600 focus:ring-2 focus:ring-teal-600/15 transition-all"
-            />
-            <button
-              type="button"
-              disabled={working || !prompt.trim()}
-              onClick={() => handleSubmit(prompt)}
-              className="shrink-0 whitespace-nowrap rounded-lg bg-[var(--color-brand,#0f766e)] px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white shadow-sm hover:bg-teal-700 hover:shadow active:scale-[0.97] active:bg-teal-800 disabled:opacity-50 disabled:pointer-events-none transition-all"
-            >
-              {working ? "Working…" : aiMode === "diagram" ? "Draw" : aiMode === "image" ? "Generate" : "Simulate"}
-            </button>
-            <button
-              type="button"
-              disabled={busy || !prompt.trim()}
-              onClick={() => { onAsk("explain", prompt.trim()); setPrompt("") }}
-              className="shrink-0 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-sm hover:border-teal-300 hover:bg-teal-50/80 hover:text-teal-900 active:bg-teal-100 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none transition-all"
-              title="Ask the Socratic Coach instead; it guides you with questions"
-            >
-              Ask Coach
-            </button>
-            <details className="relative shrink-0">
-              <summary className="cursor-pointer list-none whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-slate-700 shadow-sm hover:border-teal-300 hover:bg-teal-50/80 hover:text-teal-900 active:bg-teal-100 active:scale-[0.97] transition-all" aria-label="Ask SocratiQ about the board">Ask SocratiQ ▾</summary>
-              <div role="menu" className="absolute bottom-full right-0 mb-2 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
-                {ASK_ACTIONS.map((a) => (
-                  <button key={a.intent} type="button" role="menuitem" disabled={busy} className="block w-full rounded-lg px-3 py-1.5 text-left text-sm text-slate-700 hover:bg-teal-50 hover:text-teal-900 active:bg-teal-100 disabled:opacity-50 transition-colors"
-                    onClick={(e) => { const hasSel = Object.keys(apiRef.current?.getAppState().selectedElementIds ?? {}).length > 0; e.currentTarget.closest("details")?.removeAttribute("open"); onAsk(a.intent, a.message(hasSel)) }}>{a.label}</button>
+          <div className="pointer-events-auto flex w-full max-w-[960px] flex-wrap items-center gap-1.5 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur-sm @lg/sb:gap-2 @lg/sb:p-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5 @lg/sb:gap-2">
+              <AskSocratiqMenu
+                busy={busy}
+                compact={false}
+                hasSelection={() => Object.keys(apiRef.current?.getAppState().selectedElementIds ?? {}).length > 0}
+                onAsk={onAsk}
+              />
+              <span aria-hidden className="hidden h-6 w-px bg-slate-200 @md/sb:block" />
+              {/* What the prompt box does: draw a diagram, generate an image, or build a simulation */}
+              <div role="group" aria-label="What the AI makes" className="flex shrink-0 items-center rounded-lg border border-slate-200 bg-slate-100/90 p-0.5 text-xs font-medium">
+                {AI_MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    aria-pressed={aiMode === m.id}
+                    onClick={() => setAiMode(m.id)}
+                    title={m.title}
+                    className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-all @md/sb:px-2.5 ${
+                      aiMode === m.id
+                        ? "bg-white text-teal-800 shadow-sm border border-slate-200/60 font-semibold"
+                        : "text-slate-600 hover:text-teal-900 hover:bg-white/80 active:bg-teal-50/70"
+                    }`}
+                  >
+                    <m.Icon className="size-3" aria-hidden="true" />
+                    <span>{m.label}</span>
+                  </button>
                 ))}
               </div>
-            </details>
+              {aiMode === "image" && <ImageOptionsPicker value={imageOpts} onChange={setImageOpts} disabled={working} />}
+            </div>
+
+            <div className="flex min-w-0 flex-1 basis-full items-center gap-1.5 @2xl/sb:basis-0 @lg/sb:gap-2">
+              <label className="sr-only" htmlFor="smartboard-ai">Ask the AI to draw or explain on your board</label>
+              <input
+                id="smartboard-ai"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                disabled={working}
+                maxLength={aiMode === "image" ? 800 : 1000}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    e.preventDefault()
+                    handleSubmit(prompt)
+                  }
+                }}
+                placeholder={
+                  aiMode === "diagram"
+                    ? "Ask AI to draw a diagram… (uses selected items)"
+                    : aiMode === "image"
+                    ? "Describe the image: e.g. labelled diagram of a plant cell"
+                    : "Describe a physics, math, or logic simulation to create…"
+                }
+                dir="auto"
+                className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-800 outline-none transition-all hover:border-slate-300 focus:border-teal-600 focus:ring-2 focus:ring-teal-600/15 @lg/sb:px-3 @lg/sb:py-2 @lg/sb:text-sm"
+              />
+              <button
+                type="button"
+                disabled={working || !prompt.trim()}
+                onClick={() => handleSubmit(prompt)}
+                className="shrink-0 whitespace-nowrap rounded-lg bg-[var(--color-brand,#0f766e)] px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-teal-700 hover:shadow active:scale-[0.97] active:bg-teal-800 disabled:pointer-events-none disabled:opacity-50 @lg/sb:px-3 @lg/sb:py-2 @lg/sb:text-sm"
+              >
+                {working ? "Working…" : aiMode === "diagram" ? "Draw" : aiMode === "image" ? "Generate" : "Simulate"}
+              </button>
+              <button
+                type="button"
+                disabled={busy || !prompt.trim()}
+                onClick={() => { onAsk("explain", prompt.trim()); setPrompt("") }}
+                className="shrink-0 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-all hover:border-teal-300 hover:bg-teal-50/80 hover:text-teal-900 active:scale-[0.97] active:bg-teal-100 disabled:pointer-events-none disabled:opacity-50 @lg/sb:px-3 @lg/sb:py-2 @lg/sb:text-sm"
+                title="Send what you typed to the Socratic Coach instead; it guides you with questions"
+              >
+                Ask Coach
+              </button>
+            </div>
           </div>
         </div>
       )}

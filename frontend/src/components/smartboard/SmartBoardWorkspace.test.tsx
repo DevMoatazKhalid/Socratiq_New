@@ -40,7 +40,25 @@ describe("SmartBoardWorkspace on the real Excalidraw engine", () => {
     await waitReady(ref)
     expect(screen.getByLabelText(/Ask the AI to draw or explain/)).toBeTruthy()
     expect(screen.getByRole("button", { name: "Draw" })).toBeTruthy()
-    expect(screen.getByText(/Ask SocratiQ ▾/)).toBeTruthy()
+    expect(screen.getByRole("button", { name: /Ask SocratiQ about the board/ })).toBeTruthy()
+  })
+
+  it("Ask SocratiQ is always reachable: first in a wrapping (never sideways-scrolling) bar, with a menu that opens and sends the intent", async () => {
+    const onAsk = vi.fn()
+    const { ref } = mount(EMPTY_BOARD, { onAsk })
+    await waitReady(ref)
+    const trigger = screen.getByRole("button", { name: /Ask SocratiQ about the board/ })
+    const bar = trigger.closest(".rounded-2xl") as HTMLElement
+    expect(bar.className).toContain("flex-wrap")
+    expect(bar.className).not.toContain("overflow-x-auto")              // the old bar scrolled it out of view and clipped its menu
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu")
+    fireEvent.click(trigger)
+    expect(trigger.getAttribute("aria-expanded")).toBe("true")
+    const items = screen.getAllByRole("menuitem")
+    expect(items.length).toBe(7)
+    fireEvent.click(screen.getByRole("menuitem", { name: /Check my work/ }))
+    expect(onAsk).toHaveBeenCalledWith("correct", "Check my work on the board and tell me where to look.")
+    expect(screen.queryByRole("menu")).toBeNull()
   })
 
   it("AI drawing: request -> validated spec -> native, grouped, AI-authored elements on the live scene -> autosaved", async () => {
@@ -210,7 +228,8 @@ describe("SmartBoardWorkspace on the real Excalidraw engine", () => {
     const onAsk = vi.fn()
     const { ref } = mount(legacy(), { onAsk })
     await waitReady(ref)
-    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: "Check my work", hidden: true })) })
+    fireEvent.click(screen.getByRole("button", { name: /Ask SocratiQ about the board/ }))
+    await act(async () => { fireEvent.click(screen.getByRole("menuitem", { name: /^Check my work/ })) })
     expect(onAsk).toHaveBeenCalledWith("correct", "Check my work on the board and tell me where to look.")
   })
 })

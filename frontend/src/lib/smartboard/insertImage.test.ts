@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@/test/excalidrawEnv"
 import { describe, expect, it } from "vitest"
-import { planImageInsertion } from "./insertImage"
+import { fitImageSize, planImageInsertion, wrapCaption } from "./insertImage"
 import type { SceneEl } from "./types"
 
 const mockDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
@@ -93,9 +93,9 @@ describe("planImageInsertion", () => {
     }
   })
 
-  it("rejects images exceeding the 2.5MB payload limit", () => {
-    // Generate ~3MB base64 string
-    const bigB64 = "A".repeat(4_000_000)
+  it("rejects images exceeding the 6 MB payload limit", () => {
+    // ~7.5 MB once decoded
+    const bigB64 = "A".repeat(10_000_000)
     const bigPayload = `data:image/png;base64,${bigB64}`
 
     const res = planImageInsertion({
@@ -108,7 +108,7 @@ describe("planImageInsertion", () => {
     expect(res.ok).toBe(false)
     if (!res.ok) {
       expect(res.reason).toBe("image_too_large")
-      expect(res.message).toContain("2.5 MB size limit")
+      expect(res.message).toContain("6 MB size limit")
     }
   })
 
@@ -132,5 +132,31 @@ describe("planImageInsertion", () => {
       expect(res1.file.id).not.toBe(res2.file.id)
       expect(res1.added[0].id).not.toBe(res2.added[0].id)
     }
+  })
+
+  it("keeps the picture's own aspect ratio and writes a caption under it, in the same group", () => {
+    const res = planImageInsertion({ imageDataUrl: mockDataUrl, prompt: "water cycle", elements: [], opId: "op-cap", naturalWidth: 1600, naturalHeight: 900, caption: "The water cycle — labelled diagram" })
+    expect(res.ok).toBe(true)
+    if (!res.ok) return
+    const [img, cap] = res.added
+    expect(img.width).toBe(440)
+    expect(img.height).toBe(Math.round(440 / (16 / 9)))
+    expect(cap.type).toBe("text")
+    expect(cap.groupIds).toEqual(img.groupIds)
+    expect(cap.y).toBeGreaterThan(img.y + img.height)
+    expect(res.rect.h).toBeGreaterThan(img.height)
+  })
+})
+
+describe("fitImageSize / wrapCaption", () => {
+  it("fits portrait, landscape and unknown sizes", () => {
+    expect(fitImageSize(900, 1600, 400)).toEqual({ w: 225, h: 400 })
+    expect(fitImageSize(1600, 900, 400)).toEqual({ w: 400, h: 225 })
+    expect(fitImageSize(undefined, undefined, 380)).toEqual({ w: 380, h: 380 })
+  })
+  it("wraps long captions to at most three lines", () => {
+    const lines = wrapCaption("word ".repeat(80), 300)
+    expect(lines.length).toBe(3)
+    expect(lines[2].endsWith("…")).toBe(true)
   })
 })
