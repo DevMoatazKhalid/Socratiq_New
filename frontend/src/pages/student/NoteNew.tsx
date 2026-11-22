@@ -6,7 +6,7 @@ import { AppShell } from "@/components/layout/AppShell"
 import { courseColor } from "@/components/socratiq/CourseCard"
 import { ApiError } from "@/lib/api"
 import { newNoteId, notesPanel } from "@/lib/notes"
-import { createBoardNote, importanceLabel, NOTES_BOARD_KEY, useCreateGroup, useNotesBoard, type Importance } from "@/lib/notesBoard"
+import { createBoardNote, importanceLabel, NoteMetaError, NOTES_BOARD_KEY, organiseErrorText, useCreateGroup, useNotesBoard, type Importance } from "@/lib/notesBoard"
 import { useStudentHome } from "@/lib/queries"
 import { cn } from "@/lib/utils"
 
@@ -64,8 +64,8 @@ export default function NoteNew() {
       const g = await createGroup.mutateAsync({ name, assignment_id: null, note_ids: [] })
       setGroupIds((s) => [...s, g.id])
       setNewGroup("")
-    } catch {
-      setError("That group couldn't be created. Try again.")
+    } catch (e) {
+      setError(`That group couldn't be created. ${organiseErrorText(e)}`)
     }
   }
 
@@ -79,7 +79,13 @@ export default function NoteNew() {
       notesPanel.set({ rev: notesPanel.get().rev + 1 })
       navigate("/student/notes")
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Your note couldn't be saved. Check your connection and try again.")
+      if (e instanceof NoteMetaError) {
+        // the text is safe on the server; only its filing failed. Keep the form so "Save" retries just the filing.
+        notesPanel.set({ rev: notesPanel.get().rev + 1 })
+        setError(`Your note was saved, but its importance, course and groups weren't. ${e.message}`)
+      } else {
+        setError(e instanceof ApiError && e.message !== "Request failed" ? e.message : "Your note couldn't be saved. Check your connection and try again.")
+      }
       setSaving(false)
     }
   }
@@ -95,7 +101,7 @@ export default function NoteNew() {
       <div className="mt-5 grid max-w-[1040px] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <form className="ds-card p-6" onSubmit={(e) => { e.preventDefault(); void save() }} noValidate>
           <label htmlFor="nn-title" className="mb-1.5 block text-sm font-bold">Title</label>
-          <input id="nn-title" className="ds-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. AVL rotation cases" maxLength={200} />
+          <input id="nn-title" dir="auto" className="ds-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. AVL rotation cases" maxLength={200} />
 
           <p className="mb-1.5 mt-5 text-sm"><b>Importance</b> <span className="text-[#5a5446]">· sets the sticky note colour</span></p>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -133,7 +139,7 @@ export default function NoteNew() {
           </div>
           <div className="mt-2.5 flex items-center gap-2.5">
             <label htmlFor="nn-group" className="sr-only">New group name</label>
-            <input id="nn-group" className="ds-input !w-[180px] !rounded-full !py-1.5 text-[13px]" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="New group name"
+            <input id="nn-group" dir="auto" className="ds-input !w-[180px] !rounded-full !py-1.5 text-[13px]" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} placeholder="New group name"
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addGroup() } }} />
             <button type="button" onClick={() => void addGroup()} disabled={!newGroup.trim() || createGroup.isPending} className="text-[13px] font-semibold text-[#5c5a2a] underline disabled:opacity-50">Add</button>
           </div>
@@ -158,8 +164,8 @@ export default function NoteNew() {
         <aside className="lg:sticky lg:top-24" aria-label="Preview on the board">
           <h2 className="mb-2 text-sm font-bold">Preview on the board</h2>
           <div className={cn("ds-sticky", importance ? `ds-sticky-${importance}` : "ds-sticky-none")} aria-hidden="true">
-            <b className="text-[13.5px]">{title.trim() || "Untitled note"}</b>
-            <p className="line-clamp-3 flex-1 text-[13.5px] text-[#3d3828]">{firstLine || "Your note text appears here."}</p>
+            <b dir="auto" className="text-[13.5px]">{title.trim() || "Untitled note"}</b>
+            <p dir="auto" className="line-clamp-3 flex-1 text-[13.5px] text-[#3d3828]">{firstLine || "Your note text appears here."}</p>
             <div className="flex items-center justify-between text-[11px] font-semibold text-[#4a4436]">
               <span className="flex items-center gap-1.5"><i className="ds-dot" style={{ background: course ? courseColor[course.color] : "#8a8472" }} />{course?.name ?? "No course"} · Today</span>
               <Pin className={cn("h-4 w-4", pinned && "text-[#c2410c]")} strokeWidth={1.8} />

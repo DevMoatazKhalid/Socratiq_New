@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { api } from "./api"
+import { api, ApiError } from "./api"
 import { useNotesPanel, type NoteSummary } from "./notes"
 
 /**
@@ -80,10 +80,39 @@ export function useDeleteGroup() {
 }
 
 /** Creates a note with its organisation fields: the text goes through the existing (idempotent) create, the rest through /meta. */
+/** Thrown when the note itself was saved but its organisation (importance, pin, course, groups) was not. */
+export class NoteMetaError extends Error {
+  note: BoardNote
+  cause: unknown
+  constructor(note: BoardNote, cause: unknown) {
+    super(organiseErrorText(cause))
+    this.note = note
+    this.cause = cause
+  }
+}
+
+/** A precise sentence for a failed organisation change (never a bare "Request failed"). */
+export function organiseErrorText(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.code === "notes_board_unavailable" || e.status === 404 || e.status === 405 || e.status === 503)
+      return "The server can't store importance, pins, courses or groups yet. It needs the latest backend update and database migration 019."
+    if (e.status === 401) return "Your session has expired. Sign in again and retry."
+    if (e.status === 429) return "Too many changes at once. Wait a moment and try again."
+    if (e.message && e.message !== "Request failed") return e.message
+  }
+  return "That change wasn't saved. Check your connection and try again."
+}
+
+/** Creates the note, then files it. Creating is idempotent (same id), so a retry after a failed filing never makes a second note. */
 export async function createBoardNote(v: { id: string; title: string; content: string; meta: NoteMetaPatch }) {
-  const created = await api<BoardNote>("/student/notes", { method: "POST", body: { id: v.id, title: v.title, content: v.content } })
+  const created = normalise(await api<Partial<BoardNote> & NoteSummary>("/student/notes", { method: "POST", body: { id: v.id, title: v.title, content: v.content } }))
   const hasMeta = Object.values(v.meta).some((x) => x != null && !(Array.isArray(x) && x.length === 0) && x !== false)
-  return hasMeta ? api<BoardNote>(`/student/notes/${enc(created.id)}/meta`, { method: "PATCH", body: v.meta }) : created
+  if (!hasMeta) return created
+  try {
+    return normalise(await api<Partial<BoardNote> & NoteSummary>(`/student/notes/${enc(created.id)}/meta`, { method: "PATCH", body: v.meta }))
+  } catch (e) {
+    throw new NoteMetaError(created, e)
+  }
 }
 
 export const importanceLabel: Record<Importance, string> = { high: "High", medium: "Medium", low: "Low" }

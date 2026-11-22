@@ -46,7 +46,7 @@ function Detail({ courseId, a, ins }: { courseId: string; a: Asg; ins: TeacherIn
   const pending = subs.filter((s) => !s.grade)
   const st = STATE[stateOf(a)]
   return (
-    <section className="ds-card mt-6 overflow-hidden !border-[var(--color-plum)]" aria-labelledby="ad-h">
+    <section className="ds-card mt-5 overflow-hidden !border-[var(--color-plum)]" aria-labelledby="ad-h">
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--color-border)] bg-[#fffaf5] px-7 py-6">
         <div>
           <p className="text-sm text-[var(--color-ink-muted)]">Assignments › {st.t}</p>

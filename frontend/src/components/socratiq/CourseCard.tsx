@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { Link } from "react-router-dom"
-import { BookOpen, Calculator, Code2, FlaskConical, Laptop, Plus } from "lucide-react"
-import type { Course } from "@/types"
+import { Atom, BookOpen, Calculator, Code2, FlaskConical, Globe, Landmark, Laptop, Leaf, Music, Palette, PencilLine, Plus, type LucideIcon } from "lucide-react"
+import type { Course, CourseIconName } from "@/types"
 import { cn } from "@/lib/utils"
 
 /** Header colours of the approved course cards (CS201 red-orange, CS210 orange, MATH120 olive), keyed by the course colour stored by the API. */
@@ -12,9 +12,21 @@ export const courseColor: Record<Course["color"], string> = {
   teal: "#babd8e",
 }
 
+/** The icons offered on "Create a course" (approved design order). Names are stored by the API (migration 021). */
+export const COURSE_ICONS: { name: CourseIconName; label: string; Icon: LucideIcon }[] = [
+  { name: "book", label: "Book", Icon: BookOpen }, { name: "calculator", label: "Mathematics", Icon: Calculator },
+  { name: "flask", label: "Science lab", Icon: FlaskConical }, { name: "globe", label: "Languages and geography", Icon: Globe },
+  { name: "code", label: "Programming", Icon: Code2 }, { name: "music", label: "Music", Icon: Music },
+  { name: "palette", label: "Art and design", Icon: Palette }, { name: "atom", label: "Physics", Icon: Atom },
+  { name: "landmark", label: "History and law", Icon: Landmark }, { name: "pencil", label: "Writing", Icon: PencilLine },
+  { name: "laptop", label: "Computer systems", Icon: Laptop }, { name: "leaf", label: "Biology and nature", Icon: Leaf },
+]
+const byName = new Map(COURSE_ICONS.map((i) => [i.name, i.Icon]))
+
 const icons = [Code2, Laptop, Calculator, BookOpen, FlaskConical]
-/** A stable subject icon per course: picked from the course code/name, otherwise from its id, so a course always shows the same icon. */
-export function courseIcon(c: Pick<Course, "id" | "code" | "name">) {
+/** The course's chosen icon; otherwise a stable one picked from the code/name, else from its id, so a course always shows the same icon. */
+export function courseIcon(c: Pick<Course, "id" | "code" | "name"> & { icon?: CourseIconName | null }): LucideIcon {
+  if (c.icon && byName.has(c.icon)) return byName.get(c.icon)!
   const t = `${c.code} ${c.name}`.toLowerCase()
   if (/math|calc|algebra|stat|discrete|proof/.test(t)) return Calculator
   if (/data struct|system|network|hardware|os\b/.test(t)) return Laptop

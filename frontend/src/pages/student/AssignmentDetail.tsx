@@ -6,9 +6,11 @@ import { QueryState } from "@/components/ui/States"
 import { Clock, Paperclip, MessageCircle, Download } from "lucide-react"
 import { assignmentStatusLabel } from "@/lib/assignments"
 import { dueInfo } from "@/lib/dates"
-import { formatNumber } from "@/lib/grades"
+import { GradeResult } from "@/components/student/GradeResult"
+import { celebrateSubmission } from "@/lib/celebrate"
 import { shortDate, statusTone } from "@/lib/studentWork"
 import { cn } from "@/lib/utils"
+import { useQueryClient } from "@tanstack/react-query"
 import { downloadFile, useCapabilities, useStartAttempt, useStudentAssignment, useStudentCourse, useSubmitFile } from "@/lib/queries"
 import { formatBytes, precheck } from "@/lib/files"
 import { ApiError } from "@/lib/api"
@@ -32,6 +34,7 @@ export default function StudentAssignmentDetail() {
   const caps = useCapabilities("SUBMISSION")
   const startAttempt = useStartAttempt()
   const submit = useSubmitFile(assignmentId)
+  const qc = useQueryClient()
   const fileInput = useRef<HTMLInputElement>(null)
 
   const [file, setFile] = useState<File | null>(null)
@@ -66,6 +69,7 @@ export default function StudentAssignmentDetail() {
       const res = await submit.mutateAsync({ attemptId: attempt.id, file, onProgress: setProgress })
       setNotice(res.warning ?? null)
       setFile(null)
+      void celebrateSubmission(qc, { title: q.data?.title ?? "Your assignment", courseId, assignmentId })
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Your file couldn't be submitted. Try again.")
     }
@@ -174,18 +178,7 @@ export default function StudentAssignmentDetail() {
               </section>
             )}
 
-            {assignment.grade && (
-              <section id="grade" className="rounded-2xl border border-[var(--color-border)] bg-[#f6f4ea] p-5" aria-labelledby="grade-h">
-                <div className="ds-card px-6 py-5">
-                  <h2 id="grade-h" className="text-lg font-semibold text-[var(--color-ink)]">Your grade</h2>
-                  <p className="mt-1 text-[30px] font-bold leading-tight text-[var(--color-ink)] ds-num">{formatNumber(assignment.grade.score)} / {formatNumber(assignment.grade.maxScore)}</p>
-                  {assignment.grade.feedback && <p className="mt-3 whitespace-pre-wrap rounded-[12px] bg-[#fff8f3] px-4 py-3 text-[15px] text-[var(--color-ink)]">{assignment.grade.feedback}</p>}
-                  <p className="mt-3 text-sm text-[var(--color-ink-muted)]">
-                    Graded {new Date(assignment.grade.gradedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}{assignment.grade.gradedBy ? ` by ${assignment.grade.gradedBy}` : ""}
-                  </p>
-                </div>
-              </section>
-            )}
+            {assignment.grade && <GradeResult grade={assignment.grade} />}
 
             <section className="ds-card px-6 py-6" aria-labelledby="journey-h">
               <h2 id="journey-h" className="mb-5 text-lg font-semibold text-[var(--color-ink)]">Your learning journey</h2>

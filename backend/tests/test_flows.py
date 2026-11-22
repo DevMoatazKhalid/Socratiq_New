@@ -246,7 +246,7 @@ def test_student_detail_and_submission_review(world):
     assert [e["label"] for e in rv["verification"]["entries"]] == ["Explain", "Modify", "Transfer"] and rv["verification"]["entries"][0]["answer"]
     assert rv["signals_note"].startswith("Observed patterns only")
     asg = world.client.get(f"{API}/teacher/assignments/A1", headers=world.h("P1")).json()
-    assert asg["counts"] == {"students": 1, "submitted": 1, "verified": 1} and asg["submissions"][0]["status"] == "verified"
+    assert asg["counts"] == {"students": 1, "submitted": 1, "verified": 1, "graded": 0} and asg["submissions"][0]["status"] == "verified"
 
 
 def test_evidence_views_are_authorised(world):

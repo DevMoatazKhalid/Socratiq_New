@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/Card"
 import { Badge } from "@/components/ui/Badge"
 import { Button } from "@/components/ui/Button"
 import { MasteryBadge } from "@/components/socratiq/MasteryBadge"
+import { AssignmentGradingCard } from "@/components/teacher/AssignmentGradingCard"
 import { EmptyState, QueryState } from "@/components/ui/States"
 import { Paperclip, X } from "lucide-react"
 import { downloadFile, useAssignmentActions, useCapabilities, useTeacherAssignment, useTeacherCourse } from "@/lib/queries"
@@ -108,6 +109,8 @@ export default function TeacherAssignmentDetail() {
                   {life === "PUBLISHED" && <p className="mt-2 text-xs text-[var(--color-ink-muted)]">Once students have started, an assignment can't return to draft. Archive it instead.</p>}
                 </CardContent>
               </Card>
+
+              {life !== "DRAFT" && <AssignmentGradingCard assignmentId={a.id} assignmentTitle={a.title} courseId={courseId} courseLabel={course ? `${course.name} · ${course.code}` : "Course"} />}
 
               <h2 className="mb-3 mt-8 max-w-2xl text-sm font-semibold text-[var(--color-ink-muted)]">Submissions</h2>
               {a.submissions.length === 0 ? (

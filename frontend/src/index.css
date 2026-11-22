@@ -162,3 +162,60 @@ html { scroll-behavior: auto; }
 .tok-builtin { color: #5a4c06; }
 .tok-def { color: var(--color-ink); font-weight: 600; }
 .tok-decorator { color: #6b4fa0; }
+
+/* ------------------------------------------------------------------ mathematics in chat (KaTeX, see components/ui/MathFormula.tsx) */
+.sq-math-inline { white-space: nowrap; unicode-bidi: isolate; }
+.sq-math-inline .katex { font-size: 1.07em; }
+.sq-math-display { position: relative; margin: 0.65rem 0; border-radius: 12px; background: #fbf8f1; border: 1px solid var(--color-border);
+  border-inline-start: 3px solid var(--color-plum); }
+.sq-math-scroll { overflow-x: auto; overflow-y: hidden; padding: 0.35rem 2.4rem 0.35rem 0.9rem; max-width: 100%; }
+.sq-math-scroll:focus-visible { outline: 2px solid var(--color-teal-dark); outline-offset: -2px; }
+.sq-math-display .katex-display { margin: 0.45rem 0; }
+.sq-math-display .katex { font-size: 1.12em; }
+.sq-math-copy { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  border-radius: 8px; color: var(--color-ink-muted); background: var(--color-surface); border: 1px solid var(--color-border); opacity: 0;
+  transition: opacity 120ms ease; }
+.sq-math-display:hover .sq-math-copy, .sq-math-copy:focus-visible { opacity: 1; }
+@media (hover: none) { .sq-math-copy { opacity: 0.85; } }
+.sq-math-src { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; background: rgb(0 0 0 / 0.05); border-radius: 4px;
+  padding: 0.05em 0.3em; color: var(--color-ink); }
+@media (max-width: 480px) {
+  .sq-math-display .katex { font-size: 1em; }
+  .sq-math-scroll { padding-inline-start: 0.6rem; }
+}
+
+/* ------------------------------------------------------------------ motivational moments (components/student/CelebrationHost.tsx) */
+.sq-cele-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgb(20 17 2 / 0.38); animation: sq-fade 160ms ease-out both; }
+.sq-cele-card { position: relative; overflow: hidden; width: 100%; max-width: 440px; border-radius: 22px; background: var(--color-surface);
+  padding: 36px 28px 22px; text-align: center; box-shadow: 0 24px 60px rgb(20 17 2 / 0.25); animation: sq-pop 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.sq-cele-card:focus { outline: none; }
+.sq-cele-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; flex: none; }
+.sq-cele-celebrate { background: var(--color-plum-light); color: #b35d00; box-shadow: 0 0 0 6px #fff6e8; }
+.sq-cele-encourage { background: var(--color-success-light); color: var(--color-success-ink); box-shadow: 0 0 0 6px #f2f7f1; }
+.sq-cele-calm { background: var(--color-teal-light); color: var(--color-teal-dark); }
+.sq-cele-toast { position: fixed; z-index: 55; right: 20px; bottom: 20px; display: flex; gap: 12px; align-items: flex-start; width: min(380px, calc(100vw - 32px));
+  border-radius: 16px; border: 1px solid var(--color-border); background: var(--color-surface); padding: 14px 14px 14px 16px;
+  box-shadow: 0 12px 32px rgb(20 17 2 / 0.16); animation: sq-slide 260ms ease-out both; }
+@media (max-width: 640px) { .sq-cele-toast { right: 16px; bottom: 16px; } }
+.sq-confetti { position: absolute; inset: 0; pointer-events: none; }
+.sq-confetti i { position: absolute; top: -12px; left: var(--x); width: 8px; height: 12px; border-radius: 2px; opacity: 0;
+  background: hsl(calc(var(--i) * 47deg + 20deg) 85% 60%); animation: sq-fall 1.6s cubic-bezier(0.25, 0.6, 0.4, 1) both;
+  animation-delay: calc(var(--i) * 25ms); }
+.sq-confetti i:nth-child(3n) { width: 6px; height: 6px; border-radius: 999px; }
+@keyframes sq-fall { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(260px) rotate(540deg); } }
+@keyframes sq-pop { from { opacity: 0; transform: translateY(12px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes sq-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sq-slide { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .sq-confetti { display: none; } .sq-cele-card, .sq-cele-overlay, .sq-cele-toast { animation: none; } }
+
+/* Momentum card: 7-day dots */
+.sq-day { width: 28px; height: 28px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--color-border-strong); color: var(--color-ink-muted); background: var(--color-surface); }
+.sq-day.is-on { background: var(--color-plum); border-color: var(--color-plum); color: var(--color-on-plum); }
+.sq-day.is-today { box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-plum-light); }
+
+/* Mixed Arabic / English text. dir="auto" alone picks one direction for the whole field from its first letter, so an Arabic line typed
+   under an English line (or the reverse) came out in the wrong word order. plaintext resolves the direction per paragraph instead. */
+textarea[dir="auto"], input[dir="auto"], [dir="auto"] { unicode-bidi: plaintext; text-align: start; }
+.notes-markdown p, .notes-markdown li, .notes-markdown h1, .notes-markdown h2, .notes-markdown h3, .notes-markdown blockquote { unicode-bidi: plaintext; text-align: start; }

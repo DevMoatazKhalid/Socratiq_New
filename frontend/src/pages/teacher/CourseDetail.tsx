@@ -10,6 +10,7 @@ import { matches } from "@/lib/search"
 import { ArrowRight, Copy, Plus, RefreshCw, UploadCloud } from "lucide-react"
 import { useRotateJoinCode, useTeacherCourse } from "@/lib/queries"
 import { statusLabel } from "@/lib/files"
+import { ExportGradesButton } from "@/components/teacher/ExportGradesButton"
 
 const lifecyclePill = { DRAFT: "or", PUBLISHED: "ok", ARCHIVED: "neu" } as const
 const lifecycleText = { DRAFT: "Draft", PUBLISHED: "Published", ARCHIVED: "Archived" } as const
@@ -33,7 +34,10 @@ export default function TeacherCourseDetail() {
           return (
           <>
             <PageTitle title={course.name} subtitle={[course.description, `${course.studentCount ?? 0} student${course.studentCount === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}
-              actions={<button type="button" className="ds-btn" onClick={() => { setActiveCourseId(course.id); navigate("/teacher") }}>View course overview</button>} />
+              actions={<>
+                <ExportGradesButton courseId={course.id} courseLabel={`${course.name} · ${course.code}`} />
+                <button type="button" className="ds-btn" onClick={() => { setActiveCourseId(course.id); navigate("/teacher") }}>View course overview</button>
+              </>} />
 
             <div className="flex flex-wrap gap-4">
               {classrooms.map((k) => (
@@ -55,9 +59,9 @@ export default function TeacherCourseDetail() {
               ))}
             </div>
 
-            {searching && assignments.length === 0 && materials.length === 0 ? <div className="mt-6"><NoMatches query={query} onClear={() => setQuery("")} /></div> : (
+            {searching && assignments.length === 0 && materials.length === 0 ? <div className="mt-5"><NoMatches query={query} onClear={() => setQuery("")} /></div> : (
               <>
-                <div className="mt-6">
+                <div className="mt-5">
                   <Section title="Assignments" count={allAssignments.length} countTone="neu" flush
                     right={<Link to={`/teacher/courses/${course.id}/assignments/new`} className="ds-btn ds-btn-pri ds-btn-sm"><Plus className="h-3.5 w-3.5" aria-hidden="true" />New assignment</Link>}>
                     {allAssignments.length === 0 ? <p className="px-5 pb-6 text-sm text-[var(--color-ink-muted)]">No assignments yet. Create one so students have something to work on.</p> : assignments.length === 0 ? <p className="px-5 pb-6 text-sm text-[var(--color-ink-muted)]">No assignments match.</p> : (
@@ -82,7 +86,7 @@ export default function TeacherCourseDetail() {
                     )}
                   </Section>
                 </div>
-                <div className="mt-6">
+                <div className="mt-5">
                   <Section title="Materials" count={allMaterials.length} countTone="neu" flush
                     right={<Link to={`/teacher/courses/${course.id}/materials/new`} className="ds-btn ds-btn-sm"><UploadCloud className="h-3.5 w-3.5" aria-hidden="true" />Upload material</Link>}>
                     {allMaterials.length === 0 ? <p className="px-5 pb-6 text-sm text-[var(--color-ink-muted)]">No materials yet. Upload a reading, slide deck, spreadsheet or notes for this course.</p> : materials.length === 0 ? <p className="px-5 pb-6 text-sm text-[var(--color-ink-muted)]">No materials match.</p> : (

@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 for p in (ROOT / "backend", ROOT, ROOT / "database" / "tests"):
     sys.path.insert(0, str(p))
 os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("TEACHER_SIGNUP_CODE", "")
 
 import psycopg  # noqa: E402
 import pytest  # noqa: E402
@@ -46,6 +47,8 @@ class FakeAI:
             risk_signals=[{"signal": "long_polished_answer", "observation": "pasted a long structured answer in one turn", "metadata": {"chars": 900}}],
             sources=[])
         self.eval_score, self.eval_outcome = 0.8, "PASS"
+        # AI grading: the REAL ai.grading engine (reconciliation, flags) over a scripted model that awards `grade_share` of every criterion
+        self.grade_share, self.grade_confidence = 0.8, 0.9
 
     def _check(self):
         from app.errors import AIUnavailable
@@ -78,6 +81,30 @@ class FakeAI:
                           {"evidence_type": "EXPLANATION", "strength": "MODERATE", "observation": "explained the concept", "concept": kw["concept"]})
 
 
+    def grade_submission(self, **kw):
+        from ai.grading import GradingRequest, GradingService, UngradableSubmission
+        from ai.grading.models import CriterionAssessmentPayload, GradingPayload
+        self._check()
+        self.calls.append(("grade", kw))
+        share, conf = self.grade_share, self.grade_confidence
+
+        class _Model:
+            def invoke(self, messages):
+                return GradingPayload(criteria=[CriterionAssessmentPayload(criterion_id=c["id"], points_awarded=float(c["points"]) * share, rationale="r", evidence="")
+                                                for c in kw["rubric"]], feedback="Clear reasoning. Next, justify the step size.", teacher_summary="ok", confidence=conf)
+        try:
+            return {"result": GradingService(llm_factory=lambda schema: _Model()).grade(GradingRequest(**kw)).model_dump()}
+        except UngradableSubmission as exc:
+            return {"ungradable": {"code": exc.code, "message": exc.message}}
+
+    def suggest_rubric(self, **kw):
+        self._check()
+        self.calls.append(("rubric", kw))
+        t = float(kw["total_points"])
+        return [{"id": "method", "title": "Method", "description": "Uses the update rule", "points": t * 0.6},
+                {"id": "explain", "title": "Explanation", "description": "Explains why it works", "points": t * 0.4}]
+
+
 class World:
     def __init__(self, **kw):
         self.__dict__.update(kw)
@@ -92,6 +119,13 @@ class World:
     def x(self, sql: str, *params):
         with psycopg.connect(self.url, autocommit=True) as c:
             c.execute(sql, params)
+
+    def grade_all(self):
+        """Run the AI grading queue synchronously until it is empty."""
+        n = 0
+        while self.app.state.grading.process() is not None:
+            n += 1
+        return n
 
     def drain(self):
         """Run the ingestion worker synchronously until the queue is empty (deterministic tests)."""

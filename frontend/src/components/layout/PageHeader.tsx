@@ -20,7 +20,7 @@ export function PageHeader({
   right?: ReactNode
 }) {
   return (
-    <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--color-border)] bg-white px-4 py-3 lg:px-8 lg:py-0">
+    <header className="sticky top-0 z-20 flex min-h-16 flex-wrap items-center gap-x-3 gap-y-2 border-b border-[var(--color-border)] bg-white px-4 py-3 lg:px-7 lg:py-0">
       <button
         className="rounded-[var(--radius-sm)] p-2.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] lg:hidden"
         onClick={onMenuClick}

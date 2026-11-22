@@ -3,12 +3,11 @@ import { Link, useNavigate } from "react-router-dom"
 import { Check, Minus, X } from "lucide-react"
 import { AppShell } from "@/components/layout/AppShell"
 import { courseColor } from "@/components/socratiq/CourseCard"
-import { ApiError } from "@/lib/api"
-import { importanceLabel, useCreateGroup, useNotesBoard, type BoardNote } from "@/lib/notesBoard"
+import { importanceLabel, organiseErrorText, useCreateGroup, useNotesBoard, type BoardNote } from "@/lib/notesBoard"
 import { useStudentHome } from "@/lib/queries"
 import { matches } from "@/lib/search"
 import { cn } from "@/lib/utils"
-import { noteDate } from "./Notes"
+import { noteDate } from "@/components/notes/NotesBoardView"
 
 function Box({ state }: { state: "on" | "off" | "some" }) {
   return (
@@ -56,7 +55,7 @@ export default function NoteGroupNew() {
       await create.mutateAsync({ name: name.trim(), assignment_id: assignmentId || null, note_ids: picked })
       navigate("/student/notes")
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "The group couldn't be created. Try again.")
+      setError(`The group couldn't be created. ${organiseErrorText(e)}`)
     }
   }
 

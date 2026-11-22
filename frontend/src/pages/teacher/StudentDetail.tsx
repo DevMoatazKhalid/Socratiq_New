@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Download } from "lucide-react"
 import { AppShell } from "@/components/layout/AppShell"
 import { Avatar } from "@/components/ui/Avatar"
 import { Badge } from "@/components/ui/Badge"
@@ -12,7 +12,8 @@ import { StudentSkeleton } from "@/components/socratiq/Skeletons"
 import { AiUsagePanel, AssignmentProgress, ConceptPanel, LearningTimeline, VerificationPanel, reviewPath } from "@/components/socratiq/StudentSections"
 import { useCourses, useTeacherInsights, useTeacherStudent } from "@/lib/queries"
 import { Kpi } from "@/components/ds"
-import type { Course } from "@/types"
+import type { Course, StudentDetailInfo } from "@/types"
+import type { TeacherInsights } from "@/lib/queries"
 import { relativeTime } from "@/lib/time"
 
 const SECTIONS = [
@@ -55,6 +56,7 @@ export default function StudentDetail() {
                 actions={
                   <>
                     {latest && <ButtonLink to={reviewPath(latest.courseId, latest.assignmentId, student.id)} size="sm" variant="outline" className="gap-1.5">Latest submission <ArrowRight className="h-4 w-4" aria-hidden="true" /></ButtonLink>}
+                    <button type="button" className="ds-btn ds-btn-sm gap-1.5" onClick={() => downloadStudentInfo(student, courses, per)}><Download className="h-4 w-4" aria-hidden="true" />Download student info</button>
                     {student.courseIds[0] && <ButtonLink to={`/teacher/courses/${student.courseIds[0]}`} size="sm" variant="ghost">Course page</ButtonLink>}
                   </>
                 }
@@ -92,4 +94,28 @@ export default function StudentDetail() {
       </QueryState>
     </AppShell>
   )
+}
+
+const csvCell = (v: unknown) => { const t = v == null ? "" : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t }
+
+/** The student's record as a spreadsheet: profile, the three lenses, every assignment, concept mastery. Only what this page already shows. */
+function downloadStudentInfo(s: StudentDetailInfo, courses: Course[], per?: TeacherInsights["students"][number]) {
+  const rows: unknown[][] = [
+    ["Student", s.name], ["Email", s.email], ["Courses", courses.map((c) => `${c.name} (${c.code})`).join("; ")],
+    ["Last activity", s.lastActivityAt ?? ""], ["Mastery", s.mastery ?? ""],
+    ["Average grade %", per?.averageGrade == null ? "" : Math.round(per.averageGrade)], ["Graded", per?.graded ?? ""], ["Awaiting a grade", per?.awaiting ?? ""],
+    ["Task submission %", s.taskSubmission], ["AI Coach use %", s.socraticAiUsage], ["Review signal rate %", s.observedSignalRate],
+    ["Attempts", s.attempts], ["Revisions", s.revisions], ["Struggling topics", s.strugglingTopics.join("; ")],
+    [],
+    ["Assignment", "Due", "Submitted", "Verification", "Coach turns"],
+    ...s.assignments.map((a) => [a.title, a.dueAt ?? "", a.submitted ? "Yes" : "No", a.verificationOutcome ?? "", a.coachTurns ?? ""]),
+    [],
+    ["Concept", "Level", "Mastery %", "Evidence"],
+    ...(s.concepts ?? []).map((c) => [c.name, c.level ?? "", c.mastery == null ? "" : Math.round(c.mastery * 100), c.evidenceCount ?? ""]),
+  ]
+  const body = rows.map((r) => r.map(csvCell).join(",")).join("\r\n")
+  const url = URL.createObjectURL(new Blob(["\ufeff" + body], { type: "text/csv;charset=utf-8" }))   // BOM: Excel opens Arabic names correctly
+  const a = Object.assign(document.createElement("a"), { href: url, download: `${s.name.replace(/\s+/g, "-").toLowerCase() || "student"}-info.csv` })
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

@@ -29,6 +29,8 @@ export interface FileInfo {
   role?: "PROMPT" | "SUPPORTING"
 }
 
+export type CourseIconName = "book" | "calculator" | "flask" | "globe" | "code" | "music" | "palette" | "atom" | "landmark" | "pencil" | "laptop" | "leaf"
+
 export interface Course {
   id: string
   code: string
@@ -37,6 +39,8 @@ export interface Course {
   teacher: string
   status: "Active" | "Archived"
   color: "plum" | "slate" | "teal" | "clay"
+  /** Chosen on "Create a course" (migration 021). Absent or null: an icon is derived from the course title. */
+  icon?: CourseIconName | null
   materialCount: number
   assignmentCount: number
   studentCount?: number
@@ -79,6 +83,8 @@ export interface SubmissionRow {
   status: AssignmentStatus
   mastery: Mastery | null
   submittedAt?: string | null
+  /** Grade of the latest submission (API level 3+). Absent on older servers; null = submitted work not graded yet. */
+  grade?: { score: number; maxScore: number; percentage: number; gradedAt: string | null } | null
 }
 
 export interface EvidenceEntry {

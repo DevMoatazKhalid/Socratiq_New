@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { api, ApiError, apiStream, upload } from "./api"
+import { useMemo } from "react"
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
+import { api, ApiError, apiBlob, apiStream, upload } from "./api"
 import type { Board, BoardReport } from "./whiteboard"
 import { useAuth } from "./auth"
 import type {
@@ -32,7 +33,8 @@ export async function downloadFile(fileId: string) {
   window.open(link.url, "_blank", "noopener")
 }
 
-export interface Universities { universities: { id: string; name: string }[]; teacher_code_required?: boolean }
+/** `teacherCodeRequired`: the API client camelCases keys, so the server's `teacher_code_required` arrives under this name. */
+export interface Universities { universities: { id: string; name: string }[]; teacherCodeRequired?: boolean }
 export const fetchUniversities = () => api<Universities>("/universities", { auth: false })
 
 // ================================================================== student
@@ -118,10 +120,49 @@ export interface StudentAssignmentDetail extends Assignment {
 }
 
 /** The one persisted grade: the teacher review page and the student's assignment page both render exactly this. */
-export interface Grade { score: number; maxScore: number; percentage: number; feedback: string | null; gradedAt: string; gradedBy: string | null }
+export interface GradeCriterion { id: string; title: string; pointsAwarded: number; pointsPossible: number; level: CriterionLevel | null; comment?: string }
+export type CriterionLevel = "excellent" | "proficient" | "developing" | "beginning" | "missing"
+export interface Grade {
+  score: number; maxScore: number; percentage: number; feedback: string | null; gradedAt: string; gradedBy: string | null
+  /** manual | ai (an AI draft released unchanged) | ai_edited (an AI draft the instructor changed). Absent on servers before migration 020. */
+  source?: "manual" | "ai" | "ai_edited"
+  /** false only for an AI grade released automatically that no instructor has looked at yet */
+  reviewed?: boolean
+  /** per-criterion breakdown for rubric grades; empty for one overall score */
+  criteria?: GradeCriterion[]
+}
 
 export function useStudentAssignment(id?: string) {
   return useQuery({ queryKey: ["student", "assignment", id], enabled: !!id, queryFn: () => api<StudentAssignmentDetail>(`/student/assignments/${enc(id!)}`) })
+}
+
+/**
+ * Grades of handed-in work for servers without /student/overview (older backend). Reads each handed-in assignment from the long-standing
+ * assignment endpoint (same cache as the assignment page), so "Finished & graded" and course averages still show real grades.
+ * Returns undefined while the overview itself decides; an empty map when nothing is needed.
+ */
+export function useFallbackGrades(assignments: Assignment[] | undefined, overview: StudentOverview | null | undefined) {
+  const need = overview === null ? (assignments ?? []).filter((a) => a.status === "submitted" || a.status === "verified").slice(0, 40) : []
+  const results = useQueries({
+    queries: need.map((a) => ({ queryKey: ["student", "assignment", a.id], staleTime: 30_000, queryFn: () => api<StudentAssignmentDetail>(`/student/assignments/${enc(a.id)}`) })),
+  })
+  const stamp = need.map((a, i) => `${a.id}:${results[i]?.dataUpdatedAt ?? 0}`).join(",")
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const map = useMemo(() => buildFallback(need, results.map((r) => r.data)), [stamp])
+  return { map, loading: results.some((r) => r.isPending) }
+}
+
+function buildFallback(need: Assignment[], data: (StudentAssignmentDetail | undefined)[]) {
+  const map = new Map<string, StudentOverview["assignments"][number]>()
+  data.forEach((d, i) => {
+    if (!d) return
+    map.set(need[i].id, {
+      assignmentId: need[i].id, courseId: need[i].courseId, status: need[i].status ?? "submitted", coachTurns: 0, submittedAt: d.submission?.submittedAt ?? null,
+      grade: d.grade ? { percentage: d.grade.percentage, gradedAt: d.grade.gradedAt, feedback: d.grade.feedback } : null,
+      verification: null,
+    })
+  })
+  return map
 }
 
 export function useJoinCourse() {
@@ -290,6 +331,10 @@ export function useTeacherAssignment(id?: string) {
 
 export interface SubmissionReviewData {
   assignment: { id: string; title: string; version: number }
+  /** assessment (migration 020); null/empty on older servers */
+  grading?: GradingSettings | null
+  evaluation?: GradeEvaluation | null
+  gradeHistory?: GradeHistoryEntry[]
   student: { id: string; name: string; email: string }
   attempt: { id: string; number: number; status: string; assignmentVersion: number } | null
   submission: { id: string; type: string; submittedAt: string; textPreview: string; textTruncated: boolean; file: FileInfo | null } | null
@@ -308,14 +353,133 @@ export function useSubmissionReview(assignmentId?: string, studentId?: string) {
   })
 }
 
+/** Holistic (score + maxScore) or per rubric criterion. `evaluationId` = the AI draft this grade is based on (the server records whether it was changed). */
+export interface GradeInput { score?: number; maxScore?: number; feedback: string; criteria?: { id: string; points: number; comment?: string }[]; evaluationId?: string | null }
+
 export function useSetGrade(assignmentId: string, studentId: string) {
   const qc = useQueryClient()
   const done = () => Promise.all([qc.invalidateQueries({ queryKey: ["teacher"] }), qc.invalidateQueries({ queryKey: ["student", "assignment", assignmentId] })])
   const base = `/teacher/assignments/${enc(assignmentId)}/students/${enc(studentId)}/grade`
   return {
-    save: useMutation({ mutationFn: (v: { score: number; maxScore: number; feedback: string }) => api<{ grade: Grade }>(base, { method: "PUT", body: { score: v.score, max_score: v.maxScore, feedback: v.feedback || null } }), onSuccess: done }),
+    save: useMutation({
+      mutationFn: (v: GradeInput) => api<{ grade: Grade }>(base, { method: "PUT", body: {
+        ...(v.criteria ? { criteria: v.criteria.map((c) => ({ id: c.id, points: c.points, ...(c.comment?.trim() ? { comment: c.comment.trim() } : {}) })) } : { score: v.score, max_score: v.maxScore }),
+        feedback: v.feedback || null, ...(v.evaluationId ? { evaluation_id: v.evaluationId } : {}) } }),
+      onSuccess: done,
+    }),
     clear: useMutation({ mutationFn: () => api<{ grade: null }>(base, { method: "DELETE" }), onSuccess: done }),
   }
+}
+
+// ------------------------------------------------------------------ assessment: rubric, AI grading drafts, release (migration 020)
+export type AiGradingMode = "off" | "review" | "auto_release"
+export interface RubricCriterion { id: string; title: string; description: string; points: number }
+export interface GradingSettings {
+  assignmentId: string; aiGrading: AiGradingMode; pointsPossible: number; rubric: RubricCriterion[]; rubricSource: "none" | "teacher" | "ai"
+  updatedAt: string | null; referenceAnswer?: string; gradingNotes?: string
+}
+export interface GradingFlag { code: string; message: string; severity: "info" | "review" | "block" }
+export interface EvaluationCriterion { id: string; title: string; pointsAwarded: number; pointsPossible: number; level: CriterionLevel; rationale: string; evidence: string }
+export interface GradeEvaluation {
+  id: string; status: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED"; trigger: string; submissionId: string
+  score: number | null; maxScore: number | null; percentage: number | null; confidence: number | null
+  criteria: EvaluationCriterion[]; feedback: string | null; rationale: string | null; flags: GradingFlag[]; needsReview: boolean; error: string | null
+  stale: boolean; staleReasons: ("settings_changed" | "resubmitted")[]; createdAt: string; completedAt: string | null
+}
+export interface GradeHistoryEntry { id: string; action: "released" | "edited" | "auto_released" | "cleared"; source: string | null; at: string; actor: string
+  score: number | null; maxScore: number | null; previousScore: number | null; previousMax: number | null; note: string | null }
+export interface GradingRow {
+  studentId: string; studentName: string; email: string
+  submission: { id: string; submittedAt: string; attemptNumber: number; type: string; hasText: boolean } | null
+  grade: Grade | null; evaluation: GradeEvaluation | null
+}
+export interface GradingOverview {
+  settings: GradingSettings; students: GradingRow[]
+  counts: { students: number; submitted: number; graded: number; draftsReady: number; needsReview: number; inProgress: number; failed: number; autoReleased: number }
+}
+
+const gradingKey = (assignmentId?: string) => ["teacher", "grading", assignmentId] as const
+const busy = (e?: GradeEvaluation | null) => !!e && (e.status === "QUEUED" || e.status === "RUNNING")
+
+/** null = this server has no AI grading yet (migration 020 not applied): the page keeps the classic grading flow. */
+export function useGradingOverview(assignmentId?: string) {
+  return useQuery({
+    queryKey: gradingKey(assignmentId), enabled: !!assignmentId,
+    refetchInterval: (q) => ((q.state.data?.students ?? []).some((r) => busy(r.evaluation)) ? 2500 : false),
+    queryFn: async () => {
+      try {
+        return await api<GradingOverview>(`/teacher/assignments/${enc(assignmentId!)}/grading`)
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.code === "assessment_unavailable")) return null
+        throw e
+      }
+    },
+  })
+}
+
+export function useGradingActions(assignmentId: string) {
+  const qc = useQueryClient()
+  const base = `/teacher/assignments/${enc(assignmentId)}`
+  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: gradingKey(assignmentId) }), qc.invalidateQueries({ queryKey: ["teacher", "review", assignmentId] }),
+    qc.invalidateQueries({ queryKey: ["teacher", "insights"] }), qc.invalidateQueries({ queryKey: ["teacher", "assignment", assignmentId] }),
+    qc.invalidateQueries({ queryKey: ["teacher", "dashboard"] })])
+  return {
+    saveSettings: useMutation({
+      mutationFn: (v: Partial<{ aiGrading: AiGradingMode; pointsPossible: number; rubric: RubricCriterion[]; referenceAnswer: string; gradingNotes: string }>) =>
+        api<{ settings: GradingSettings }>(`${base}/grading`, { method: "PUT", body: {
+          ...(v.aiGrading !== undefined ? { ai_grading: v.aiGrading } : {}), ...(v.pointsPossible !== undefined ? { points_possible: v.pointsPossible } : {}),
+          ...(v.rubric !== undefined ? { rubric: v.rubric } : {}), ...(v.referenceAnswer !== undefined ? { reference_answer: v.referenceAnswer } : {}),
+          ...(v.gradingNotes !== undefined ? { grading_notes: v.gradingNotes } : {}) } }),
+      onSuccess: refresh,
+    }),
+    suggestRubric: useMutation({ mutationFn: (pointsPossible?: number) =>
+      api<{ criteria: RubricCriterion[]; pointsPossible: number }>(`${base}/grading/rubric-suggestion`, { method: "POST", body: pointsPossible ? { points_possible: pointsPossible } : {} }) }),
+    run: useMutation({ mutationFn: (v: { studentIds?: string[]; includeGraded?: boolean; regrade?: boolean } = {}) =>
+      api<{ queued: number; skipped: { inProgress: number; upToDate: number; graded: number } }>(`${base}/grading/run`, { method: "POST", body: {
+        ...(v.studentIds ? { student_ids: v.studentIds } : {}), include_graded: !!v.includeGraded, regrade: !!v.regrade } }), onSuccess: refresh }),
+    gradeOne: useMutation({ mutationFn: (studentId: string) => api<{ evaluation: GradeEvaluation }>(`${base}/students/${enc(studentId)}/evaluation`, { method: "POST" }), onSuccess: refresh }),
+    release: useMutation({ mutationFn: (v: { studentIds?: string[]; minConfidence?: number } = {}) =>
+      api<{ released: number; skipped: { needsReview: number; blocked: number; lowConfidence: number; notReady: number } }>(`${base}/grading/release`, { method: "POST", body: {
+        ...(v.studentIds ? { student_ids: v.studentIds } : {}), min_confidence: v.minConfidence ?? 0 } }),
+      onSuccess: () => Promise.all([refresh(), qc.invalidateQueries({ queryKey: ["teacher"] })]) }),
+  }
+}
+
+// ------------------------------------------------------------------ Excel export
+/** Downloads the workbook with the user's token (a plain link could not send it). `scope` = a course or one assignment. */
+export async function downloadGradesXlsx(scope: { courseId: string } | { assignmentId: string }, opts: { includeFeedback?: boolean; includeInactive?: boolean; includeRubric?: boolean } = {}) {
+  const tz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC" } catch { return "UTC" } })()
+  const q = new URLSearchParams({ tz, include_feedback: String(opts.includeFeedback ?? true), include_inactive: String(opts.includeInactive ?? false),
+    include_rubric: String(opts.includeRubric ?? true) })
+  const path = "courseId" in scope ? `/teacher/courses/${enc(scope.courseId)}/grades.xlsx` : `/teacher/assignments/${enc(scope.assignmentId)}/grades.xlsx`
+  const { blob, filename } = await apiBlob(`${path}?${q}`)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = filename ?? "SocratiQ_grades.xlsx"
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
+  return filename
+}
+
+// ------------------------------------------------------------------ study momentum (motivation)
+export interface Momentum {
+  today: string
+  streak: { current: number; activeToday: boolean; longest: number; week: { date: string; active: boolean }[] }
+  totals: { submissions: number; verified: number; graded: number; activeDays30: number }
+  next: { streak: number | null; submissions: number | null; verified: number | null }
+  lastActive: string | null
+  celebrations: import("./motivation").ServerCelebration[]
+}
+const tzParam = () => { try { return `?tz=${enc(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC")}` } catch { return "" } }
+export const fetchMomentum = () => api<Momentum>(`/student/momentum${tzParam()}`)
+/** null = this server has no momentum endpoint yet. */
+export function useMomentum() {
+  return useQuery({ queryKey: ["student", "momentum"], staleTime: 60_000, queryFn: async () => {
+    try { return await fetchMomentum() } catch (e) { if (e instanceof ApiError && e.status === 404) return null; throw e }
+  } })
 }
 
 export function useTeacherMaterial(id?: string) {
@@ -329,7 +493,7 @@ export function useTeacherMaterial(id?: string) {
 export function useCreateCourse() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (v: { code: string; title: string; description: string; color: string }) => api<Course>("/teacher/courses", { method: "POST", body: v }),
+    mutationFn: (v: { code: string; title: string; description: string; color: string; icon?: string | null }) => api<Course>("/teacher/courses", { method: "POST", body: v }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["teacher"] }),
   })
 }

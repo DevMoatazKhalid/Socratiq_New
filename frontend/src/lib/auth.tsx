@@ -26,10 +26,33 @@ export interface PendingProfile {
 
 type Status = "loading" | "signed_out" | "needs_profile" | "ready" | "error"
 
+/** The sign-up choices also travel with the Supabase account (user_metadata), so the profile can be created on any device,
+ *  e.g. after confirming the email on a phone. The instructor code is never stored there. */
+function profileFromMetadata(meta: Record<string, unknown> | undefined): PendingProfile | null {
+  if (!meta) return null
+  const role = meta.socratiq_role
+  const firstName = typeof meta.first_name === "string" ? meta.first_name : ""
+  const lastName = typeof meta.last_name === "string" ? meta.last_name : ""
+  const universityId = typeof meta.university_id === "string" ? meta.university_id : ""
+  if ((role !== "STUDENT" && role !== "PROFESSOR") || !firstName || !lastName || !universityId) return null
+  return { firstName, lastName, role, universityId }
+}
+
+function readPending(): PendingProfile | null {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY)
+    return raw ? (JSON.parse(raw) as PendingProfile) : null
+  } catch {
+    return null
+  }
+}
+
 interface AuthValue {
   status: Status
   me: Me | null
   error: string | null
+  /** What the person chose at sign-up, when the profile could not be created automatically (pre-fills Complete Profile). */
+  pending: PendingProfile | null
   signIn: (email: string, password: string) => Promise<void>
   /** Returns "signed_in" or "confirm_email" (project requires email confirmation before a session exists). */
   signUp: (email: string, password: string, profile: PendingProfile) => Promise<"signed_in" | "confirm_email">
@@ -48,6 +71,7 @@ export function homeFor(role: Role) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>(isConfigured ? "loading" : "error")
   const [me, setMe] = useState<Me | null>(null)
+  const [pending, setPending] = useState<PendingProfile | null>(null)
   const [error, setError] = useState<string | null>(isConfigured ? null : "This deployment is missing its Supabase settings (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).")
   const loading = useRef(false)
 
@@ -64,20 +88,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus("ready")
     } catch (e) {
       if (e instanceof ApiError && e.code === "profile_required") {
-        const pending = localStorage.getItem(PENDING_KEY)
-        if (pending) {
+        // The choices made at sign-up: this browser's copy first (it can carry the instructor code), else the account's metadata.
+        const local = readPending()
+        const saved = local ?? profileFromMetadata(session.user?.user_metadata)
+        if (saved) {
           try {
-            await createProfile(JSON.parse(pending) as PendingProfile)
+            await createProfile(saved)
             localStorage.removeItem(PENDING_KEY)
+            setPending(null)
+            setError(null)
             setMe(await api<Me>("/me"))
             setStatus("ready")
             return
           } catch (err) {
+            if (err instanceof ApiError && err.code === "profile_exists") {      // created meanwhile (another tab or device)
+              localStorage.removeItem(PENDING_KEY)
+              setMe(await api<Me>("/me"))
+              setStatus("ready")
+              return
+            }
             setError(err instanceof ApiError ? err.message : "We couldn't finish setting up your account.")
-            // A rejected instructor code must not be retried on every load; the Complete Profile form asks for it again.
-            if (err instanceof ApiError && err.code === "invalid_signup_code") localStorage.removeItem(PENDING_KEY)
           }
         }
+        // Only what is still missing is asked for: Complete Profile is pre-filled and keeps the role chosen at sign-up.
+        setPending(saved)
         setMe(null)
         setStatus("needs_profile")
       } else if (e instanceof ApiError && e.status === 401) {
@@ -103,25 +137,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [load])
 
   const value = useMemo<AuthValue>(() => ({
-    status, me, error,
+    status, me, error, pending,
     async signIn(email, password) {
       const { error: err } = await supabase.auth.signInWithPassword({ email, password })
       if (err) throw new Error(err.message === "Invalid login credentials" ? "That email and password don't match." : err.message)
     },
     async signUp(email, password, profile) {
-      const { data, error: err } = await supabase.auth.signUp({ email, password })
-      if (err) throw new Error(err.message)
+      // Saved BEFORE the Supabase call: Supabase announces the new session while signUp is still running, and the profile must
+      // already be there when that happens, otherwise the app would ask for the same details again.
       localStorage.setItem(PENDING_KEY, JSON.stringify(profile))
+      setError(null)
+      const { data, error: err } = await supabase.auth.signUp({
+        email, password,
+        options: { data: { first_name: profile.firstName, last_name: profile.lastName, university_id: profile.universityId, socratiq_role: profile.role } },
+      })
+      if (err) {
+        localStorage.removeItem(PENDING_KEY)
+        throw new Error(err.message)
+      }
       return data.session ? "signed_in" : "confirm_email"
     },
     async completeProfile(p) {
       await createProfile(p)
       localStorage.removeItem(PENDING_KEY)
+      setPending(null)
+      setError(null)
       setMe(await api<Me>("/me"))
       setStatus("ready")
     },
     async signOut() {
       await supabase.auth.signOut()
+      localStorage.removeItem(PENDING_KEY)
+      setPending(null)
       setMe(null)
       setStatus("signed_out")
     },
@@ -129,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/login` })
       if (err) throw new Error(err.message)
     },
-  }), [status, me, error])
+  }), [status, me, error, pending])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -8,6 +8,7 @@ import { DashboardSkeleton } from "@/components/socratiq/Skeletons"
 import { QueryState } from "@/components/ui/States"
 import { matches } from "@/lib/search"
 import { signalTone } from "@/lib/teacherWork"
+import { ExportGradesButton } from "@/components/teacher/ExportGradesButton"
 import type { TeacherInsights } from "@/lib/queries"
 import type { StudentRow as Row } from "@/types"
 
@@ -39,7 +40,7 @@ function csv(rows: (string | number | null)[][]) {
 /** Students (approved design): academic performance, understanding and engagement, side by side. */
 export default function TeacherStudents() {
   const navigate = useNavigate()
-  const { courses, course, setCourse, dash, insights, detail } = useTeacherScope()
+  const { courses, course, setCourse, dash, insights } = useTeacherScope()
   const [query, setQuery] = useState("")
   const [band, setBand] = useState<Band>("all")
   const [sort, setSort] = useState<"grade" | "name" | "activity" | "signals">("grade")
@@ -57,14 +58,21 @@ export default function TeacherStudents() {
                 .filter((r) => matches(query, r.s.name))
                 .sort((a, b) => sort === "name" ? a.s.name.localeCompare(b.s.name) : sort === "signals" ? b.sig - a.sig
                   : sort === "activity" ? (b.s.risk.lastActivityAt ?? "").localeCompare(a.s.risk.lastActivityAt ?? "") : (b.g ?? -1) - (a.g ?? -1))
+              // Per-student grades come from the insights endpoint. Without it (older server) nothing per student is claimed.
+              const perStudent = !!insights.data
               const graded = all.filter((r) => r.g != null).length
               const withSig = all.filter((r) => r.sig > 0)
               const awaiting = insights.data?.grades.awaiting
-              const section = detail.data?.classrooms.map((k) => k.name).join(", ")
+              const gradedWork = insights.data?.grades.graded
+              const subs = insights.data?.submissions ?? []
+              const asgCols = (insights.data?.assignments ?? []).filter((a) => a.lifecycle !== "DRAFT")
               const exportCsv = () => {
-                const body = csv([["Student", "Average grade %", "Graded", "Submitted", "Verification %", "Last activity", "Review signals", "Attention"],
-                  ...rows.map((r) => [r.s.name, r.g, r.p?.graded ?? null, r.p?.submitted ?? null, r.p?.verificationRate ?? null, r.s.risk.lastActivityAt, r.sig, attention(r.s, r.p).t])])
-                const url = URL.createObjectURL(new Blob([body], { type: "text/csv" }))
+                const head = ["Student", "Average grade %", "Graded", "Submitted", "Awaiting grade", "Verification %",
+                  ...asgCols.map((a) => `${a.title} (%)`), "Review signals", "Main review indicator", "Mastery", "Last activity", "Attention"]
+                const body = csv([head, ...rows.map((r) => [r.s.name, r.g, r.p?.graded ?? null, r.p?.submitted ?? null, r.p?.awaiting ?? null, r.p?.verificationRate ?? null,
+                  ...asgCols.map((a) => { const x = subs.find((v) => v.studentId === r.s.id && v.assignmentId === a.id); return x ? (x.grade ? x.grade.percentage : "submitted, not graded") : "not submitted" }),
+                  r.sig, r.s.risk.primaryReason, r.s.mastery ?? "No data", r.s.risk.lastActivityAt ? new Date(r.s.risk.lastActivityAt).toLocaleString() : null, attention(r.s, r.p).t])])
+                const url = URL.createObjectURL(new Blob(["\ufeff" + body], { type: "text/csv;charset=utf-8" }))   // BOM: Excel opens Arabic names correctly
                 const a = Object.assign(document.createElement("a"), { href: url, download: `${course.code || "course"}-students.csv` })
                 a.click(); URL.revokeObjectURL(url)
               }
@@ -72,22 +80,23 @@ export default function TeacherStudents() {
                 <>
                   <PageTitle title="Students" subtitle="Academic performance, understanding and engagement, side by side"
                     actions={<>{list.length > 1 && <CourseSelect courses={list} course={course} onChange={setCourse} />}
-                      {section && <span className="ds-sel">{section}</span>}
-                      <button type="button" className="ds-btn" onClick={exportCsv} disabled={rows.length === 0}>Export</button></>} />
+                      <button type="button" className="ds-btn" onClick={exportCsv} disabled={rows.length === 0} title="Roster as shown, one column per assignment">CSV</button>
+                      <ExportGradesButton courseId={course.id} courseLabel={`${course.name} · ${course.code}`} /></>} />
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <Kpi icon={<span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--color-slate-light)]"><Users className="h-4 w-4" /></span>} label="Total students" value={d.overview.students} hint="Enrolled" />
                     <Kpi highlight icon={<span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--color-plum-light)]"><GraduationCap className="h-4 w-4" /></span>} label="Average grade"
-                      value={d.metrics.averageGrade == null ? "—" : `${d.metrics.averageGrade}%`} spark={(insights.data?.trend ?? []).map((t) => t.averageGrade)} hint={`${graded} graded of ${d.overview.students} · ungraded excluded`} />
+                      value={d.metrics.averageGrade == null ? "—" : `${d.metrics.averageGrade}%`} spark={(insights.data?.trend ?? []).map((t) => t.averageGrade)}
+                      hint={d.metrics.averageGrade == null ? "No graded work yet" : perStudent ? `${gradedWork} graded submission${gradedWork === 1 ? "" : "s"} · ${graded} of ${d.overview.students} students graded` : "Course mean of graded work"} />
                     <Kpi icon={<span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--color-slate-light)]"><Eye className="h-4 w-4" /></span>} label="Review signals" value={withSig.length}
                       hint={`${withSig.filter((r) => r.sig >= 2).length} with 2+ signals · ${withSig.filter((r) => r.sig === 1).length} with 1 signal`} />
-                    <Kpi icon={<span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--color-success-light)]"><Clock className="h-4 w-4" /></span>} label="Awaiting grades" value={awaiting ?? "—"} hint="Submitted, not graded yet" />
+                    <Kpi icon={<span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-[var(--color-success-light)]"><Clock className="h-4 w-4" /></span>} label="Awaiting grades" value={awaiting ?? "—"} hint={perStudent ? "Submitted, not graded yet" : "Needs the updated server"} />
                   </div>
 
                   <div className="mt-5 flex flex-wrap items-center gap-2">
                     <label className="ds-search w-full sm:w-[260px]"><Search className="h-4 w-4 shrink-0" aria-hidden="true" />
                       <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name" aria-label="Search students by name" /></label>
-                    {BANDS.map((b) => {
+                    {BANDS.filter((b) => perStudent || b.key === "all" || b.key === "signals").map((b) => {
                       const n = all.filter((r) => b.test(r.g, r.sig)).length
                       return <button key={b.key} type="button" className="ds-chip" aria-pressed={band === b.key} onClick={() => setBand(b.key)}>{b.label} · {n}</button>
                     })}
@@ -108,7 +117,7 @@ export default function TeacherStudents() {
                             return (
                               <tr key={s.id} data-href onClick={() => navigate(`/teacher/students/${s.id}`)}>
                                 <td><Link to={`/teacher/students/${s.id}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-3 whitespace-nowrap hover:underline"><Avatar name={s.name} className="!h-10 !w-10" /><b className="font-semibold">{s.name}</b></Link></td>
-                                <td>{g == null ? <Pill tone="neu">Not graded</Pill> : (
+                                <td>{!perStudent ? <span className="text-xs text-[var(--color-ink-muted)]">—</span> : g == null ? <Pill tone="neu">Not graded</Pill> : (
                                   <span className="flex min-w-[170px] items-center gap-3"><b className="w-10 ds-num">{Math.round(g)}%</b><span className="ds-bar"><i style={{ width: `${g}%`, background: gradeColor(g) }} /></span></span>
                                 )}</td>
                                 <td className="ds-num">{p ? `${p.graded} / ${p.submitted}` : "—"}</td>

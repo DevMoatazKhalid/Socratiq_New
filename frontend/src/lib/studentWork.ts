@@ -31,9 +31,10 @@ export function stepOf(status: AssignmentStatus, coachTurns: number): { step: nu
   return { step: 1, done: false }
 }
 
-export function workRows(assignments: Assignment[], courses: Course[], overview: StudentOverview | null | undefined): WorkRow[] {
+export function workRows(assignments: Assignment[], courses: Course[], overview: StudentOverview | null | undefined,
+  fallback?: Map<string, StudentOverview["assignments"][number]>): WorkRow[] {
   const byCourse = new Map(courses.map((c) => [c.id, c]))
-  const extra = new Map((overview?.assignments ?? []).map((x) => [x.assignmentId, x]))
+  const extra = new Map(overview ? overview.assignments.map((x) => [x.assignmentId, x]) : [...(fallback ?? new Map()).entries()])
   return assignments.map((a) => {
     const x = extra.get(a.id)
     const status = (x?.status ?? a.status ?? "not_started") as AssignmentStatus

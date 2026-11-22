@@ -1,3 +1,10 @@
+## Unreleased: assessment system, grade export, study encouragement, maths in chat
+- Added AI-assisted grading as an instructor tool: per-assignment grading setup (rubric, reference answer, grading notes, mode review / auto-release / off), a queued grading worker, deterministic reconciliation with review flags (text aimed at the grader, low confidence, disagreeing runs, unverifiable evidence, feedback that leaks the reference answer), release as drafted or edited, bulk release with safeguards, and an append-only grade history. Migration `020_assessment.sql` (reversible; before it is applied the old grading keeps working). See docs/ASSESSMENT.md.
+- Students see their grade with a per-criterion breakdown, levels, instructor comments and feedback with maths; never the reference answer, notes, AI rationale or flags.
+- Added Excel export of a course or an assignment: Summary, Gradebook with live formulas, Details, Rubric sheets; injection-safe text, instructor time zone.
+- Added study encouragement: server-side milestones (streak, submissions, verifications, comeback, released grades) celebrated once across devices, a momentum card on the student home, rate-limited moments, break suggestions and a student setting (All / Milestones only / Off).
+- AI Coach and feedback now render LaTeX (inline, display, multi-line `aligned`) with KaTeX, lazily loaded; prices and code are never treated as maths; read-aloud speaks formulas as words.
+
 ## Unreleased: teaching personas, concept-aware adaptation, validated streaming
 - Added five teaching personas (style only, below policy), student selection API/UI, persistence (`017_teaching_personas.sql`) and per-turn attribution across Chat, Board and Live.
 - Chat prompt now renders policy from the canonical `ai/brain/policy.py` (prompt v4).

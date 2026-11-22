@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils"
 import { CheckCircle2 } from "lucide-react"
 import { useAnswerVerification, useStartVerification, useStudentAssignment, useStudentCourse, type VerificationState } from "@/lib/queries"
 import { ApiError } from "@/lib/api"
+import { useQueryClient } from "@tanstack/react-query"
+import { celebrateVerification } from "@/lib/celebrate"
 
 const LABEL: Record<string, string> = { EXPLAIN: "Explain", MODIFY: "Modify", TRANSFER: "Transfer" }
 
@@ -14,6 +16,7 @@ export default function Verification() {
   const assignment = useStudentAssignment(assignmentId)
   const start = useStartVerification()
   const answerM = useAnswerVerification()
+  const qc = useQueryClient()
 
   const [state, setState] = useState<VerificationState | null>(null)
   const [answer, setAnswer] = useState("")
@@ -48,6 +51,8 @@ export default function Verification() {
       setFeedback(r.result.feedback || null)
       setAnswer("")
       setState(r.state)
+      if (r.state.status === "COMPLETED" && state.status !== "COMPLETED")
+        void celebrateVerification(qc, { title: assignment.data?.title ?? "this assignment", passed: r.state.outcome === "PASS" })
     } catch (e) {
       setError(
         e instanceof ApiError && e.code === "ai_unavailable" ? "We couldn't evaluate your answer just now. It wasn't recorded, so you can send it again."
