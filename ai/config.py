@@ -142,7 +142,8 @@ class ModelConfig:
         )
         self.model = model or _get_clean_env("AI_MODEL_DEFAULT") or provider_fallback
 
-        default_temp = "0.2" if role == ModelRole.REASONING else "0.5"
+        # VERIFICATION generates and grades assessment questions: a low default keeps questions grounded and grading consistent.
+        default_temp = "0.2" if role in (ModelRole.REASONING, ModelRole.VERIFICATION) else "0.5"
         raw_temp = (
             _get_clean_env(f"AI_TEMPERATURE_{role.value}")
             or _get_clean_env("AI_TEMPERATURE_DEFAULT")

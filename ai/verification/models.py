@@ -64,6 +64,16 @@ class VerificationChallengeRequest(BaseModel):
     verification_type: VerificationType
     student_work: str
     course_context: Optional[str] = None
+    # --- Lesson grounding (all optional; older callers that send only the fields above keep working) ---
+    assignment_title: Optional[str] = None
+    subject_area: Optional[str] = None
+    is_programming: bool = False
+    # Excerpts of the course material retrieved for this assignment (RAG). The questions must be answerable from these + the instructions.
+    lesson_material: list[str] = Field(default_factory=list)
+    # Every concept linked to the assignment. `concept` stays the primary one; the generator may target another one from this list.
+    candidate_concepts: list[str] = Field(default_factory=list)
+    # Questions already asked earlier in this verification run, so the three questions do not repeat each other.
+    previous_questions: list[str] = Field(default_factory=list)
 
 
 class VerificationChallenge(BaseModel):
@@ -74,6 +84,10 @@ class VerificationChallenge(BaseModel):
     concept: str
     question: str
     criteria: list[str] = Field(default_factory=list)
+    # Provenance for logs/tests (not persisted): "generated" (first draft accepted), "regenerated" (accepted after a retry),
+    # or "fallback" (no draft passed the quality gate; a validated safe question was used instead).
+    source: str = "generated"
+    quality_notes: list[str] = Field(default_factory=list)
 
 
 class VerificationRequest(BaseModel):

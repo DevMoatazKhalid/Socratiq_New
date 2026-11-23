@@ -122,7 +122,12 @@ def test_generate_challenge_fallback_on_llm_failure(monkeypatch, verification_se
     challenge = verification_service.generate_challenge(req)
 
     assert challenge.verification_type == VerificationType.EXPLAIN
-    assert "learning_rate" in challenge.question
+    # The fallback is natural language ("learning rate", never the raw identifier) and is marked as a fallback...
+    assert "learning rate" in challenge.question
+    assert "learning_rate" not in challenge.question
+    assert challenge.source == "fallback"
+    # ...while the STORED concept keeps the caller's spelling (it keys the student's concept mastery).
+    assert challenge.concept == "learning_rate"
     assert len(challenge.criteria) >= 1
 
 
@@ -285,7 +290,10 @@ def test_verify_insufficient_evidence_on_llm_failure(monkeypatch, verification_s
 
 
 def test_verification_challenge_prompts_enforce_short_constraints():
-    """Verify that challenge and evaluation prompts enforce 5-12 words, single direct question, and concise answers."""
+    """Challenge prompts demand one direct, open, short-answer question grounded in the lesson, with a type-specific purpose.
+
+    (v1 demanded 5-12 words; that cap pushed the model to cram ideas into telegraphic, ungrammatical questions and was removed.)
+    """
     from ai.verification.strategies.explain import ExplainStrategy
     from ai.verification.strategies.modify import ModifyStrategy
     from ai.verification.strategies.transfer import TransferStrategy
@@ -301,30 +309,22 @@ def test_verification_challenge_prompts_enforce_short_constraints():
         student_work="def search(arr, x): ...",
     )
 
-    # Explain prompt checks
-    explain_msgs = explain.build_challenge_prompt(req)
-    explain_sys = explain_msgs[0].content
-    assert "5–12 words" in explain_sys or "5-12 words" in explain_sys
-    assert "one direct question" in explain_sys.lower()
-    assert "short answer" in explain_sys.lower()
-    assert "multiple choice" in explain_sys.lower()
+    for strat in (explain, modify, transfer):
+        req.verification_type = strat.verification_type
+        sys_msg = strat.build_challenge_prompt(req)[0].content.lower()
+        assert "one direct question" in sys_msg
+        assert "short answer" in sys_msg
+        assert "multiple choice" in sys_msg
+        assert "8-30 words" in sys_msg
+        assert "ground the question in the lesson" in sys_msg
+        assert "never ask why or how a topic \"works\"" in sys_msg
 
-    # Modify prompt checks
-    req.verification_type = VerificationType.MODIFY
-    modify_msgs = modify.build_challenge_prompt(req)
-    modify_sys = modify_msgs[0].content
-    assert "5–12 words" in modify_sys or "5-12 words" in modify_sys
-    assert "one condition or assumption" in modify_sys.lower()
-    assert "what changes" in modify_sys.lower()
-    assert "short answer" in modify_sys.lower()
-
-    # Transfer prompt checks
-    req.verification_type = VerificationType.TRANSFER
-    transfer_msgs = transfer.build_challenge_prompt(req)
-    transfer_sys = transfer_msgs[0].content
-    assert "5–12 words" in transfer_sys or "5-12 words" in transfer_sys
-    assert "simple case" in transfer_sys.lower() or "novel" in transfer_sys.lower()
-    assert "short answer" in transfer_sys.lower()
+    assert "core understanding" in explain.build_challenge_prompt(req)[0].content.lower()
+    modify_sys = modify.build_challenge_prompt(req)[0].content.lower()
+    assert "one condition or assumption" in modify_sys
+    assert "what changes" in modify_sys
+    transfer_sys = transfer.build_challenge_prompt(req)[0].content.lower()
+    assert "simple case" in transfer_sys
 
     # Evaluation prompts check that concise 1-sentence answers can PASS
     eval_req = VerificationRequest(
@@ -343,8 +343,12 @@ def test_verification_challenge_prompts_enforce_short_constraints():
         assert "sentence" in eval_sys.lower()
 
 
-def test_generate_challenge_fallbacks_are_concise_and_distinct(monkeypatch, verification_service):
-    """Verify fallbacks across Explain, Modify, and Transfer are 5-12 words, contain concept, and are distinct."""
+def test_generate_challenge_fallbacks_are_clear_valid_and_distinct(monkeypatch, verification_service):
+    """When the model is down, each step falls back to a plain question that names the concept, passes the quality gate, never uses
+    the old "Why does <concept> work in your solution?" frame, and differs from the other two steps."""
+    from ai.verification.question_context import build_lesson_context
+    from ai.verification.question_quality import check_question
+
     monkeypatch.setattr(
         "ai.verification.service.get_structured_llm",
         lambda role, schema: FakeStructuredLLM(raises=RuntimeError("LLM unavailable")),
@@ -358,22 +362,17 @@ def test_generate_challenge_fallbacks_are_concise_and_distinct(monkeypatch, veri
             concept=concept,
             verification_type=vtype,
             student_work="def fact(n): return 1 if n<=1 else n*fact(n-1)",
+            previous_questions=[c.question for c in challenges.values()],
         )
         ch = verification_service.generate_challenge(req)
         challenges[vtype] = ch
 
-        # Verify concept inclusion
+        assert ch.source == "fallback"
         assert concept in ch.question
+        assert "in your solution" not in ch.question.lower()
+        assert ch.question.count("?") == 1 and ch.question.endswith("?")
+        assert 5 <= len(ch.question.split()) <= 40
+        assert check_question(ch.question, build_lesson_context(req)).ok
 
-        # Verify word count 5-12 words
-        words = ch.question.split()
-        assert 5 <= len(words) <= 12, f"Fallback for {vtype} had {len(words)} words: '{ch.question}'"
-
-    # Verify all 3 questions are mutually distinct
     questions = [ch.question for ch in challenges.values()]
     assert len(set(questions)) == 3, f"Fallback questions must be distinct: {questions}"
-
-    # Verify distinct pedagogical focuses
-    assert "why" in challenges[VerificationType.EXPLAIN].question.lower()
-    assert "changes" in challenges[VerificationType.MODIFY].question.lower()
-    assert "where else" in challenges[VerificationType.TRANSFER].question.lower()

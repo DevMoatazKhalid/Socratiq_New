@@ -63,8 +63,33 @@ describe("RichText code-block renderer (in-chat code runner hook)", () => {
   })
   it("an unfinished fence (still streaming) stays text and never reaches the renderer", () => {
     const fn = vi.fn()
-    render(<RichText text={"```py\nprint(1)"} renderCodeBlock={fn} />)
+    render(<RichText text={"```py\nprint(1)"} renderCodeBlock={fn} streaming />)
     expect(fn).not.toHaveBeenCalled()
+  })
+  it("a FINISHED reply whose last fence was never closed still gets its code block (no stray backticks)", () => {
+    const seen: [string, string, number][] = []
+    const { container } = render(
+      <RichText text={"First:\n```python\nx = 1\n```\nNow try:\n```python\nprint(x + 1)\n"} renderCodeBlock={(code, lang, i) => { seen.push([code, lang, i]); return <div>{code}</div> }} />,
+    )
+    expect(seen).toEqual([["x = 1", "python", 0], ["print(x + 1)", "python", 1]])
+    expect(container.textContent).toContain("Now try:")
+    expect(container.textContent).not.toContain("```")
+  })
+  it("keeps explanation text, several blocks and their order; each block gets its own index", () => {
+    const seen: [string, string, number][] = []
+    const { container } = render(
+      <RichText text={"Explain.\n\n```python\nprint('a')\n```\n\nMiddle text\n\n```js\nconsole.log(1)\n```\n\nEnd."} renderCodeBlock={(code, lang, i) => { seen.push([code, lang, i]); return <div data-testid={`blk${i}`}>{code}</div> }} />,
+    )
+    expect(seen).toEqual([["print('a')", "python", 0], ["console.log(1)", "js", 1]])
+    const text = container.textContent ?? ""
+    expect(text.indexOf("Explain.")).toBeLessThan(text.indexOf("print('a')"))
+    expect(text.indexOf("Middle text")).toBeLessThan(text.indexOf("console.log(1)"))
+    expect(text).toContain("End.")
+  })
+  it("a fence tag with extra info reaches the renderer unchanged (the code block normalises it)", () => {
+    const fn = vi.fn(() => null)
+    render(<RichText text={"```Python title=demo.py\nprint(1)\n```"} renderCodeBlock={fn} />)
+    expect(fn).toHaveBeenCalledWith("print(1)", "python title=demo.py", 0)
   })
 })
 

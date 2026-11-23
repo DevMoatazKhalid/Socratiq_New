@@ -1,33 +1,16 @@
 """
-Explain Verification Strategy: Checks if the student can explain why their solution works.
+Explain Verification Strategy: core understanding -- can the student explain the main concept as taught?
 """
 from __future__ import annotations
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from ai.verification.models import (
-    VerificationChallengeRequest,
     VerificationRequest,
     VerificationType,
 )
 from ai.verification.safety import GRADER_DATA_RULE, wrap_student_response
 from ai.verification.strategies.base import BaseVerificationStrategy
-
-_CHALLENGE_SYSTEM = """You are an expert pedagogy system designing a concise 'Conceptual Explanation' verification question.
-Given a student's completed or partially completed work on an assignment, design a targeted question asking them to explain the core mechanics or reasoning behind a key concept ({concept}).
-
-Requirements:
-- Verify conceptual understanding using exactly one direct question.
-- Target the concept specifically: {concept}.
-- Ask them to explain *why* something works or why a choice was made in their work.
-- Length constraint: Prefer 5–12 words per question whenever practical.
-- Ask only one thing. Avoid compound questions, preamble, or unnecessary context.
-- Require a short answer, ideally one sentence or a few words.
-- Adapt the question to the student's actual work and lesson context.
-- Do NOT make it multiple choice.
-- Do NOT ask trivia or rote definitions; ask about their actual reasoning.
-- Define 2-3 clear criteria for what constitutes a sound explanation.
-"""
 
 _EVALUATION_SYSTEM = """You are an expert pedagogical evaluator assessing a student's conceptual explanation.
 Determine whether the student truly understands the underlying concept or if they are repeating superficial phrases.
@@ -50,16 +33,9 @@ Evaluate each rubric criterion individually and provide constructive student fee
 
 class ExplainStrategy(BaseVerificationStrategy):
     verification_type = VerificationType.EXPLAIN
-
-    def build_challenge_prompt(self, request: VerificationChallengeRequest) -> list:
-        system = SystemMessage(content=_CHALLENGE_SYSTEM.format(concept=request.concept))
-        human = (
-            f"Concept: {request.concept}\n"
-            f"Assignment Context: {request.course_context or 'N/A'}\n\n"
-            f"Student's Work:\n{request.student_work}\n\n"
-            "Generate the explanation challenge question and 2-3 rubric criteria."
-        )
-        return [system, HumanMessage(content=human)]
+    type_label = "Core understanding"
+    objective = """Check that the student understands the main idea of the concept as it was taught: what it is, what its key parts or
+steps do, or why it matters. Ask them to explain in their own words; do not ask for a memorised definition or trivia."""
 
     def build_evaluation_prompt(self, request: VerificationRequest) -> list:
         criteria_str = "\n".join(f"- {c}" for c in request.criteria) if request.criteria else "(Standard conceptual criteria)"

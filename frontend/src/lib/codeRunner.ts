@@ -26,16 +26,23 @@ export interface RunResult {
 
 const DISABLED: CodeRuntime = { enabled: false, languages: [], limits: { timeoutMs: 0, memoryMb: 0, outputBytes: 0 } }
 
-// One shared lookup per page load (the chat can hold many code blocks). A failure is retried after a minute, not on every render.
+// One shared lookup per page load (the chat can hold many code blocks). A working runtime is kept for 5 minutes. A failed lookup or an
+// "off" answer is kept for only 30 s: the runner may still be starting or briefly unreachable, and a stale "off" used to hide every Run
+// button for 5 minutes (one of the reasons Run appeared only some of the time).
+const RUNTIME_TTL_MS = 5 * 60_000
+export const RUNTIME_RETRY_MS = 30_000
 let cached: { at: number; value: Promise<CodeRuntime> } | null = null
 export function fetchCodeRuntime(): Promise<CodeRuntime> {
   const now = Date.now()
-  if (!cached || now - cached.at > 5 * 60_000) {
-    const value = api<CodeRuntime>("/student/code/runtime").catch(() => {
-      if (cached) cached.at = Date.now() - 4 * 60_000
-      return DISABLED
-    })
-    cached = { at: now, value }
+  if (!cached || now - cached.at > RUNTIME_TTL_MS) {
+    const entry = { at: now, value: Promise.resolve(DISABLED) }
+    entry.value = api<CodeRuntime>("/student/code/runtime")
+      .catch(() => DISABLED)
+      .then((rt) => {
+        if (!rt?.enabled) entry.at = Date.now() - RUNTIME_TTL_MS + RUNTIME_RETRY_MS
+        return rt ?? DISABLED
+      })
+    cached = entry
   }
   return cached.value
 }
@@ -43,22 +50,65 @@ export function resetCodeRuntimeCache() {
   cached = null
 }
 
-/** The runtime, or null while it is being looked up. Works without a react-query provider (chat bubbles are rendered in many places). */
+/** The runtime, or null while it is being looked up. Works without a react-query provider (chat bubbles are rendered in many places).
+ *  While the answer is "off", it is looked up again a few times (shared cache, so one request for all blocks), so a runner that was still
+ *  starting when the chat opened gives the blocks already on screen their Run button without a reload. */
 export function useCodeRuntime(enabled = true): CodeRuntime | null {
   const [rt, setRt] = useState<CodeRuntime | null>(null)
   useEffect(() => {
     if (!enabled) return
     let live = true
-    void fetchCodeRuntime().then((v) => { if (live) setRt(v) })
-    return () => { live = false }
+    let tries = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const load = () => {
+      void fetchCodeRuntime().then((v) => {
+        if (!live) return
+        setRt(v)
+        if (!v.enabled && tries++ < 3) timer = setTimeout(load, RUNTIME_RETRY_MS + 50)
+      })
+    }
+    load()
+    return () => { live = false; if (timer) clearTimeout(timer) }
   }, [enabled])
   return rt
 }
 
-/** The runnable language for a fence tag such as "py" or "python", or null (unsupported, unknown, or the runner is off). */
-export function runnableLanguage(runtime: CodeRuntime | null, fence: string): CodeLanguage | null {
+/** The language named by a fence's info string: "Python", "python title=x", "{python}", ".py", "language-python" all give "python"/"py". */
+export function fenceLanguage(info: string): string {
+  const first = info.trim().toLowerCase().split(/[\s{},:;]+/).find(Boolean) ?? ""
+  return first.replace(/^language-/, "").replace(/^\./, "")
+}
+
+const PY_STRONG = [
+  /^\s*print\s*\(/m,                                              // print(...)
+  /^\s*def\s+[A-Za-z_]\w*\s*\(.*\)\s*(?:->\s*[^:]+)?:\s*(?:#.*)?$/m,  // def f(x):
+  /^\s*class\s+[A-Za-z_]\w*\s*(?:\(.*\))?\s*:\s*(?:#.*)?$/m,       // class A:
+  /^\s*(?:import\s+[A-Za-z_][\w.]*(?:\s+as\s+\w+)?|from\s+[A-Za-z_.][\w.]*\s+import\s+.+)\s*$/m,
+  /^\s*for\s+[A-Za-z_][\w, ]*\s+in\s+.+:\s*(?:#.*)?$/m,             // for x in y:
+  /^\s*(?:if|elif|while|with)\s+.+:\s*(?:#.*)?$/m,                 // if x:
+]
+const NOT_PY = [
+  /[;{]\s*$/m,                                                     // C-family line endings
+  /^\s*}/m,
+  /\b(?:const|let|var|function|console\.|System\.out|public\s+static|#include|std::|fn\s+main|=>)/,
+  /^\s*(?:\$|>>>|\.\.\.)\s/m,                                      // a shell / REPL transcript, not a program
+  /^\s*</m,                                                        // markup
+]
+
+/** For a fence with NO language tag: "python" when the code is unmistakably Python, otherwise "" (no guess). Deliberately conservative: a
+ *  wrong guess would offer Run on code that is not Python, so anything ambiguous stays copy-only. */
+export function guessFenceLanguage(code: string): string {
+  const src = code.trim()
+  if (!src || src.length > 20_000) return ""
+  if (NOT_PY.some((re) => re.test(src))) return ""
+  return PY_STRONG.some((re) => re.test(src)) ? "python" : ""
+}
+
+/** The runnable language for a fence tag such as "py" or "python", or null (unsupported, unknown, or the runner is off). For an untagged
+ *  fence, pass the code: it is used only to recognise unmistakable Python (see guessFenceLanguage). */
+export function runnableLanguage(runtime: CodeRuntime | null, fence: string, code?: string): CodeLanguage | null {
   if (!runtime?.enabled) return null
-  const tag = fence.trim().toLowerCase()
+  const tag = fenceLanguage(fence) || (code !== undefined ? guessFenceLanguage(code) : "")
   if (!tag) return null
   return runtime.languages.find((l) => l.id === tag || l.aliases.includes(tag)) ?? null
 }

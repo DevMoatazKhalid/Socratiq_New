@@ -162,6 +162,9 @@ def test_real_verification_flow_and_llm_outage_is_not_recorded(real):
         r = real.client.post(f"{API}/student/verification/{vid}/response", json={"answer": "it scales the step size"}, headers=h)
         assert r.status_code == 200
     assert r.json()["state"]["outcome"] == "PASS"
+    # The fake model returns the same question for every step; the quality gate rejects the repeats, so the three stored questions differ.
+    texts = [r["question_text"] for r in real.q("select question_text from verification_questions order by display_order")]
+    assert len(texts) == 3 and len(set(texts)) == 3 and texts[0] == "Why does the learning rate matter here?"
     assert float(real.q("select score from verification_runs")[0]["score"]) == pytest.approx(0.9)
     assert float(real.q("select mastery_estimate from student_concept_state")[0]["mastery_estimate"]) == pytest.approx(0.9)
 
@@ -172,8 +175,11 @@ def test_challenge_generation_failure_falls_back_to_a_valid_question(real):
     real.client.post(f"{API}/student/attempts/T1/submit", json={"text": "work"}, headers=h)
     st = real.client.post(f"{API}/student/assignments/A1/verification", headers=h).json()
     q = st["current"]["question"]
-    assert q.endswith("?") and "work in your solution" in q          # the AI module's documented fallback (ai/verification/service.py), not the (failed) LLM output
-    assert q != "Why does the learning rate matter here?"
+    assert q != "Why does the learning rate matter here?"                  # not the (failed) LLM output
+    # The validated safe fallback (ai/verification/question_review.py): one clear question that passes the quality gate. It must NOT be
+    # the old "Why does <concept> work in your solution?" template, which produced "Why does anatomy of the kidney work in your solution?".
+    assert q.endswith("?") and q.count("?") == 1 and len(q.split()) >= 5
+    assert "work in your solution" not in q
 
 
 def test_a_slow_ai_times_out_cleanly_and_persists_nothing(real):

@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from ai.brain.personas import persona_directive
 from ai.brain.policy import policy_rules_block
 
-RESPONSE_PROMPT_VERSION = "v4"
+RESPONSE_PROMPT_VERSION = "v5"      # v5: code must be in a language-tagged fence (the chat's Run button depends on it)
 
 _SYSTEM_TEMPLATE = """You are the AI Learning Coach speaking directly to a university student. \
 You are a real adaptive tutor -- not a generic assistant and not an answer key.
@@ -48,6 +48,14 @@ single dollar signs ($a^2 + b^2 = c^2$), and a standalone equation or a multi-li
 between double dollar signs on their own lines ($$...$$, using \\begin{{aligned}} ... \\end{{aligned}} \
 with & and \\\\ for aligned steps). Never put math inside code blocks, and write a literal dollar \
 amount as \\$5.
+- Whenever your reply contains program code (a short example, a line of the student's code you are \
+discussing, a snippet to try), put it in a fenced Markdown code block: the opening fence names the \
+language on its own line (```python, ```javascript, ...), then the code, then a closing ``` on its own \
+line. Never write multi-line code as plain text, as indented text, or inside single backticks (single \
+backticks are only for a short name such as `len` or `i`). Python blocks get a Run button in this chat, \
+so when running a tiny example would let the student test an idea themselves, make it a complete \
+snippet that prints its result. A code block does not count toward the sentence limit above. This \
+formatting never relaxes the policy rules above: never put the assignment's solution in a code block.
 
 List any concepts you explicitly reference by name in `referenced_concepts`.
 """

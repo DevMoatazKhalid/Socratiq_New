@@ -129,6 +129,35 @@ describe("RunnableCodeBlock", () => {
     expect(screen.queryByRole("button", { name: /run/i })).toBeNull()
   })
 
+  it("offers Run for a fence tag with extra info and for an untagged fence holding unmistakable Python", async () => {
+    render(<><RunnableCodeBlock code={"print(6 * 7)"} lang="python title=demo.py" blockKey="t:0" /><RunnableCodeBlock code={"for i in range(3):\n    print(i)"} lang="" blockKey="t:1" /></>)
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Run code" })).toHaveLength(2))
+    await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: "Run code" })[1]) })
+    expect(posts()[0].body).toMatchObject({ language: "python", source: "for i in range(3):\n    print(i)" })
+  })
+
+  it("untagged code that is not clearly Python (JavaScript, shell) stays copy-only", async () => {
+    render(<><RunnableCodeBlock code={"const x = 1;\nconsole.log(x)"} lang="" blockKey="t:2" /><RunnableCodeBlock code={"console.log(1)"} lang="javascript" blockKey="t:3" /></>)
+    await waitFor(() => expect(h.calls.some((c) => c.path === "/student/code/runtime")).toBe(true))
+    expect(screen.queryByRole("button", { name: /run/i })).toBeNull()
+    expect(screen.getAllByRole("button", { name: "Copy code" })).toHaveLength(2)
+  })
+
+  it("a runner that was off when the chat opened gives the blocks on screen their Run button once it is up", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      h.runtime.enabled = false
+      render(<RunnableCodeBlock code={"print(1)"} lang="py" blockKey="t:4" />)
+      await waitFor(() => expect(h.calls.filter((c) => c.path === "/student/code/runtime")).toHaveLength(1))
+      expect(screen.queryByRole("button", { name: "Run code" })).toBeNull()
+      h.runtime.enabled = true
+      await act(async () => { await vi.advanceTimersByTimeAsync(31_000) })
+      expect(await screen.findByRole("button", { name: "Run code" })).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("keeps the result with its block across a remount (switching views)", async () => {
     const { unmount } = render(<RunnableCodeBlock code={"print(6 * 7)"} lang="py" blockKey="m9:0" />)
     const run = await screen.findByRole("button", { name: "Run code" })
