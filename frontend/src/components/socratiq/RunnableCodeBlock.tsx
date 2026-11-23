@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Check, Copy, Eraser, Loader2, Pencil, Play, RotateCcw, Square, Terminal } from "lucide-react"
 import { ApiError } from "@/lib/api"
-import { cancelRun, codeBlockStore, describeStatus, newRunId, runCode, runnableLanguage, useCodeRuntime, type BlockState, type RunResult } from "@/lib/codeRunner"
+import { cancelRun, codeBlockStore, describeStatus, fenceLanguage, guessFenceLanguage, newRunId, runCode, runnableLanguage, useCodeRuntime, type BlockState, type RunResult } from "@/lib/codeRunner"
 import { cn } from "@/lib/utils"
 import { CodeEditor } from "./CodeEditor"
 
@@ -14,8 +14,10 @@ const toolBtn = "inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-xs 
  * original reply is never changed: editing works on a copy that Reset restores, and the result stays with this block (keyed by message + index).
  */
 export function RunnableCodeBlock({ code, lang, blockKey }: { code: string; lang: string; blockKey: string }) {
-  const runtime = useCodeRuntime(!!lang.trim())
-  const language = runnableLanguage(runtime, lang)
+  // The fence tag names the language; an untagged fence is runnable only when its code is unmistakably Python (lib/codeRunner).
+  const tag = fenceLanguage(lang) || guessFenceLanguage(code)
+  const runtime = useCodeRuntime(!!tag)
+  const language = runnableLanguage(runtime, tag)
   const saved = codeBlockStore.get(blockKey)
   const [state, setState] = useState<BlockState>(() => saved ?? { source: code, edited: false, stdin: "", result: null, error: null })
   const [editing, setEditing] = useState(false)
@@ -88,7 +90,7 @@ export function RunnableCodeBlock({ code, lang, blockKey }: { code: string; lang
   return (
     <div className="my-2 overflow-hidden rounded-[var(--radius-md)] border border-black/[0.08] bg-white/60" data-testid="code-block">
       <div className="flex flex-wrap items-center gap-1 border-b border-black/[0.06] px-2 py-1">
-        <span className="mr-auto pl-1 font-mono text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">{language?.label ?? (lang.trim() || "code")}{state.edited ? " · edited" : ""}</span>
+        <span className="mr-auto pl-1 font-mono text-[11px] uppercase tracking-wide text-[var(--color-ink-muted)]">{language?.label ?? (tag || "code")}{state.edited ? " · edited" : ""}</span>
         <button type="button" className={cn(toolBtn, "text-[var(--color-ink-muted)] hover:bg-black/[0.05] hover:text-[var(--color-ink)]")} onClick={() => void copy()} aria-label="Copy code">
           {copied ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <Copy className="h-3.5 w-3.5" aria-hidden="true" />}{copied ? "Copied" : "Copy"}
         </button>
@@ -120,7 +122,7 @@ export function RunnableCodeBlock({ code, lang, blockKey }: { code: string; lang
 
       <CodeEditor
         value={state.source}
-        language={lang}
+        language={tag}
         label="Code editor"
         readOnly={!language || !editing || isRunning}
         onChange={(source) => update({ source, edited: source !== code })}

@@ -1,0 +1,1367 @@
+{
+  "universities": [
+    {
+      "university_id": "cairo_university",
+      "name": "Cairo University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "alexandria_university",
+      "name": "Alexandria University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "ain_shams_university",
+      "name": "Ain Shams University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "assiut_university",
+      "name": "Assiut University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "tanta_university",
+      "name": "Tanta University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "mansoura_university",
+      "name": "Mansoura University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "zagazig_university",
+      "name": "Zagazig University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "capital_university",
+      "name": "Capital University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "minia_university",
+      "name": "Minia University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "menoufia_university",
+      "name": "Menoufia University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "suez_canal_university",
+      "name": "Suez Canal University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "qena_university",
+      "name": "Qena University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "beni_suef_university",
+      "name": "Beni-Suef University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "fayoum_university",
+      "name": "Fayoum University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "benha_university",
+      "name": "Benha University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "kafrelsheikh_university",
+      "name": "Kafrelsheikh University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "sohag_university",
+      "name": "Sohag University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "port_said_university",
+      "name": "Port Said University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "damanhour_university",
+      "name": "Damanhour University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "aswan_university",
+      "name": "Aswan University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "damietta_university",
+      "name": "Damietta University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "suez_university",
+      "name": "Suez University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "sadat_city_university",
+      "name": "Sadat City University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "arish_university",
+      "name": "Arish University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "new_valley_university",
+      "name": "New Valley University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "matrouh_university",
+      "name": "Matrouh University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "luxor_university",
+      "name": "Luxor University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "hurghada_university",
+      "name": "Hurghada University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "october_6_university",
+      "name": "October 6 University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "october_university_for_modern_sciences_and_arts",
+      "name": "October University for Modern Sciences and Arts",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "misr_university_for_science_and_technology",
+      "name": "Misr University for Science and Technology",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "misr_international_university",
+      "name": "Misr International University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "german_university_in_cairo",
+      "name": "German University in Cairo",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "modern_university_for_technology_and_information",
+      "name": "Modern University for Technology and Information",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "ahram_canadian_university",
+      "name": "Ahram Canadian University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "british_university_in_egypt",
+      "name": "British University in Egypt",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "sinai_university",
+      "name": "Sinai University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "future_university_in_egypt",
+      "name": "Future University in Egypt",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "pharos_university_in_alexandria",
+      "name": "Pharos University in Alexandria",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "nahda_university_in_beni_suef",
+      "name": "Nahda University in Beni Suef",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "egyptian_russian_university",
+      "name": "Egyptian Russian University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "delta_university_for_science_and_technology",
+      "name": "Delta University for Science and Technology",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "heliopolis_university",
+      "name": "Heliopolis University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "new_giza_university",
+      "name": "New Giza University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "deraya_university",
+      "name": "Deraya University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "badr_university_in_cairo",
+      "name": "Badr University in Cairo",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "horus_university",
+      "name": "Horus University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "egyptian_chinese_university",
+      "name": "Egyptian Chinese University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "merit_university",
+      "name": "Merit University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "sphinx_university",
+      "name": "Sphinx University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "salam_university",
+      "name": "Salam University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "badr_university_in_assiut",
+      "name": "Badr University in Assiut",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "new_salzhiya_university",
+      "name": "New Salhia University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "hayah_university",
+      "name": "Hayah University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "may_university_in_cairo",
+      "name": "May University in Cairo",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "al_reyada_university_for_science_and_technology",
+      "name": "Al-Reyada University for Science and Technology",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "innovation_university",
+      "name": "Innovation University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "city_university_in_cairo",
+      "name": "City University in Cairo",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "rashid_university",
+      "name": "Rashid University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "badya_university",
+      "name": "Badya University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "wadi_el_nile_university",
+      "name": "Wadi El Nile University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "lotus_university",
+      "name": "Lotus University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "obour_university_for_science_and_technology",
+      "name": "Obour University for Science and Technology",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "memphis_university",
+      "name": "Memphis University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "east_capital_university",
+      "name": "East Capital University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "misr_new_higher_education_university",
+      "name": "Misr New Higher Education University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "king_salman_international_university",
+      "name": "King Salman International University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "alamein_international_university",
+      "name": "Alamein International University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "galala_university",
+      "name": "Galala University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "new_mansoura_university",
+      "name": "New Mansoura University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "egyptian_e_learning_university",
+      "name": "Egyptian E-Learning University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "nile_university",
+      "name": "Nile University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "universite_francaise_d_egypte",
+      "name": "Universite Francaise d'Egypte",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "egypt_university_of_informatics",
+      "name": "Egypt University of Informatics",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "helwan_national_university",
+      "name": "Helwan National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "mansoura_national_university",
+      "name": "Mansoura National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "benha_national_university",
+      "name": "Benha National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "menoufia_national_university",
+      "name": "Menoufia National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "beni_suef_national_university",
+      "name": "Beni-Suef National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "assuit_national_university",
+      "name": "Assiut National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "south_valley_national_university",
+      "name": "South Valley National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "minia_national_university",
+      "name": "Minia National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "east_port_said_national_university",
+      "name": "East Port Said National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "alexandria_national_university",
+      "name": "Alexandria National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "zagazig_national_university",
+      "name": "Zagazig National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "new_ismailia_national_university",
+      "name": "New Ismailia National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "suez_national_university",
+      "name": "Suez National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "damanhour_national_university",
+      "name": "Damanhour National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "cairo_national_university",
+      "name": "Cairo National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "ain_shams_national_university",
+      "name": "Ain Shams National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "sohag_national_university",
+      "name": "Sohag National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "kafrelsheikh_national_university",
+      "name": "Kafrelsheikh National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "new_valley_national_university",
+      "name": "New Valley National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "fayoum_national_university",
+      "name": "Fayoum National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "tanta_national_university",
+      "name": "Tanta National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "luxor_national_university",
+      "name": "Luxor National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "damietta_national_university",
+      "name": "Damietta National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "sadat_city_national_university",
+      "name": "Sadat City National University",
+      "created_at": "2026-09-24 14:26:55.943060+00:00"
+    },
+    {
+      "university_id": "Al-Azhar",
+      "name": "Al-Azhar University",
+      "created_at": "2026-10-19 18:00:19.280950+00:00"
+    }
+  ],
+  "public_users": [
+    {
+      "user_id": "usr_d1b519ef3daa465caa39eb0630472360",
+      "auth_user_id": "25808451-3757-4bb0-b8a8-951f700afc15",
+      "university_id": "Al-Azhar",
+      "email": "3li3mer6@gmail.com",
+      "first_name": "Ali",
+      "last_name": "Amer",
+      "role": "PROFESSOR",
+      "created_at": "2026-10-19 18:50:09.364285+00:00"
+    },
+    {
+      "user_id": "usr_a7fc7861a4aa445bb904d22a5470ff81",
+      "auth_user_id": "a03bf308-b809-44a9-b43a-f881b6e8cb4c",
+      "university_id": "Al-Azhar",
+      "email": "mohabmosad9@gmail.com",
+      "first_name": "Mohab",
+      "last_name": "Mosad",
+      "role": "PROFESSOR",
+      "created_at": "2026-10-19 19:06:47.220150+00:00"
+    },
+    {
+      "user_id": "usr_61dc7dbbe0d94e489acbec212e051352",
+      "auth_user_id": "fe1abd2d-b0a0-4ddc-a40c-922a1592c664",
+      "university_id": "arish_university",
+      "email": "mutaz99@gmail.com",
+      "first_name": "as",
+      "last_name": "ass",
+      "role": "PROFESSOR",
+      "created_at": "2026-10-19 19:09:10.449646+00:00"
+    },
+    {
+      "user_id": "usr_08d3cee967b54769849f9b12c0ef0bf3",
+      "auth_user_id": "d3e70c0a-a762-4bb0-b623-90c320143559",
+      "university_id": "Al-Azhar",
+      "email": "mohabmosad7@gmail.com",
+      "first_name": "Stalin",
+      "last_name": "Mosad",
+      "role": "STUDENT",
+      "created_at": "2026-10-19 20:14:36.461315+00:00"
+    },
+    {
+      "user_id": "usr_e2e_student",
+      "auth_user_id": "fcb56989-da28-4e02-9ef4-29ef6c469d33",
+      "university_id": "Al-Azhar",
+      "email": "test_student_e2e@socratiq.ai",
+      "first_name": "E2E",
+      "last_name": "Student",
+      "role": "STUDENT",
+      "created_at": "2026-11-17 22:30:52.192507+00:00"
+    },
+    {
+      "user_id": "usr_c064ec78de1746d1a87401c98ca98bd6",
+      "auth_user_id": "48d884c8-b93b-4240-95a1-c850a347518f",
+      "university_id": "Al-Azhar",
+      "email": "aliamerali@gmail.com",
+      "first_name": "Ali",
+      "last_name": "3mer",
+      "role": "STUDENT",
+      "created_at": "2026-11-19 14:45:11.188219+00:00"
+    },
+    {
+      "user_id": "usr_824812466da5496c95bf89cb707f7a85",
+      "auth_user_id": "7b8659c3-cb57-465c-a28e-97ba8aafd196",
+      "university_id": "Al-Azhar",
+      "email": "ahm912007@gmail.com",
+      "first_name": "Ahmed",
+      "last_name": "Ali",
+      "role": "STUDENT",
+      "created_at": "2026-11-22 00:08:10.840910+00:00"
+    },
+    {
+      "user_id": "usr_b0c0fe96e437484eaa9c08a3b6414c06",
+      "auth_user_id": "4d350f72-ce8f-425f-a826-5512383d3b1b",
+      "university_id": "Al-Azhar",
+      "email": "ahmm912007@gmail.com",
+      "first_name": "Ahmed",
+      "last_name": "Ali",
+      "role": "STUDENT",
+      "created_at": "2026-11-22 00:13:10.686990+00:00"
+    },
+    {
+      "user_id": "usr_11a49419b41a41a39aab7f62f78d8345",
+      "auth_user_id": "7989791f-668a-4087-8ead-41b39c27dc8c",
+      "university_id": "Al-Azhar",
+      "email": "ahm964231@gmail.com",
+      "first_name": "Ahmed",
+      "last_name": "Ali",
+      "role": "STUDENT",
+      "created_at": "2026-11-22 00:19:46.493313+00:00"
+    },
+    {
+      "user_id": "usr_6cffc364357845dc9cadc87375f25e40",
+      "auth_user_id": "47034940-907b-4268-9b4d-b8904dc8425d",
+      "university_id": "benha_national_university",
+      "email": "hello@gmail.com",
+      "first_name": "anas",
+      "last_name": "darby",
+      "role": "STUDENT",
+      "created_at": "2026-11-22 00:23:12.972389+00:00"
+    },
+    {
+      "user_id": "usr_a69a022580e84717a210db5e2c568f74",
+      "auth_user_id": "67acdcaf-39a1-4a78-8784-7ac8ae4de75d",
+      "university_id": "Al-Azhar",
+      "email": "andrew@gmail.com",
+      "first_name": "andrew",
+      "last_name": "maged",
+      "role": "STUDENT",
+      "created_at": "2026-11-22 11:08:21.438052+00:00"
+    },
+    {
+      "user_id": "usr_da57962b5ee748ed8e5409bc17ebad11",
+      "auth_user_id": "4d3fe795-1a5e-4038-9f0c-4de227120579",
+      "university_id": "Al-Azhar",
+      "email": "ahm@gmail.com",
+      "first_name": "Ahmed",
+      "last_name": "Ali",
+      "role": "PROFESSOR",
+      "created_at": "2026-11-22 11:17:57.713767+00:00"
+    },
+    {
+      "user_id": "usr_d71fc16fcaf74b20aa757fb7c7a9dda0",
+      "auth_user_id": "f4558470-3601-408c-9052-2c6f67482547",
+      "university_id": "alexandria_national_university",
+      "email": "lmutaz99@gmail.com",
+      "first_name": "diwb",
+      "last_name": "wi2h",
+      "role": "PROFESSOR",
+      "created_at": "2026-10-20 15:33:15.802327+00:00"
+    },
+    {
+      "user_id": "usr_3b2897abbe5f47e481f236743f278754",
+      "auth_user_id": "e7ffbfb2-a4f8-488c-accd-75f5c362f540",
+      "university_id": "alamein_international_university",
+      "email": "moatazkhalid221@gmail.com",
+      "first_name": "123",
+      "last_name": "qwe",
+      "role": "STUDENT",
+      "created_at": "2026-10-20 15:33:58.145766+00:00"
+    },
+    {
+      "user_id": "usr_a40949f7a8894fd1abb4874c37ff1a3f",
+      "auth_user_id": "35ddd126-183b-4368-bb99-e81a97cff8c8",
+      "university_id": "Al-Azhar",
+      "email": "lmutaz@gmail.com",
+      "first_name": "mut",
+      "last_name": "jashdb",
+      "role": "STUDENT",
+      "created_at": "2026-10-20 20:39:24.791945+00:00"
+    },
+    {
+      "user_id": "usr_b00dc20949254f79845defd446cd7e20",
+      "auth_user_id": "8c97221a-5de8-4798-8427-c259c5ebb8db",
+      "university_id": "Al-Azhar",
+      "email": "aliamer952006@gmail.com",
+      "first_name": "Ali",
+      "last_name": "Amer",
+      "role": "PROFESSOR",
+      "created_at": "2026-10-24 15:23:22.228195+00:00"
+    },
+    {
+      "user_id": "usr_e483e0038d1749f8a3bcfda3e30e23e7",
+      "auth_user_id": "35db107d-b02e-4ac0-9522-144662ff74c1",
+      "university_id": "tanta_national_university",
+      "email": "abdo@gmail.com",
+      "first_name": "abdo",
+      "last_name": "sowelam",
+      "role": "STUDENT",
+      "created_at": "2026-10-29 19:03:40.307951+00:00"
+    },
+    {
+      "user_id": "usr_774e4f5576f7452c903bddf9850db220",
+      "auth_user_id": "abcb7b0b-717e-45c6-8a96-912311de5f80",
+      "university_id": "Al-Azhar",
+      "email": "aliamer680367ali@gmail.com",
+      "first_name": "Ali",
+      "last_name": "Amer",
+      "role": "STUDENT",
+      "created_at": "2026-10-29 20:51:04.716763+00:00"
+    },
+    {
+      "user_id": "usr_9386df896f6c4127b1bef04d16d0b52f",
+      "auth_user_id": "cc3f0079-80c8-4d4c-93b7-a1d34f4a6e0d",
+      "university_id": "Al-Azhar",
+      "email": "4hanaamer380@gmail.com",
+      "first_name": "Hana",
+      "last_name": "Amer",
+      "role": "STUDENT",
+      "created_at": "2026-10-29 21:03:23.775006+00:00"
+    },
+    {
+      "user_id": "usr_67d22183c8d5457d9d7de4c497dbeb28",
+      "auth_user_id": "cbf58bbc-6767-44cd-a840-315071a0700e",
+      "university_id": "Al-Azhar",
+      "email": "aliamer@gmail.com",
+      "first_name": "Electrical",
+      "last_name": "Engineering",
+      "role": "STUDENT",
+      "created_at": "2026-11-03 22:03:45.401628+00:00"
+    },
+    {
+      "user_id": "usr_83c7c9e4da4e48d5b1c3e436ba591d3b",
+      "auth_user_id": "783ca217-c7ac-4401-970b-62557fb4700c",
+      "university_id": "Al-Azhar",
+      "email": "ahmed@gmail.com",
+      "first_name": "Ahmed",
+      "last_name": "Mohamed",
+      "role": "PROFESSOR",
+      "created_at": "2026-11-04 13:27:00.947514+00:00"
+    },
+    {
+      "user_id": "usr_940558b16ab14bae95cdfc61c7d1aaa8",
+      "auth_user_id": "48bae3af-c89f-4721-9f16-28808c4b4360",
+      "university_id": "Al-Azhar",
+      "email": "mohammed@gmail.com",
+      "first_name": "Mohammed",
+      "last_name": "Ali",
+      "role": "STUDENT",
+      "created_at": "2026-11-04 13:43:17.376531+00:00"
+    },
+    {
+      "user_id": "usr_470ed55177204e27a43f3d78b8060b5e",
+      "auth_user_id": "7a278a03-6217-4307-ade8-c67bf92c8216",
+      "university_id": "Al-Azhar",
+      "email": "ziad@gmail.com",
+      "first_name": "Ziad",
+      "last_name": "Khaled",
+      "role": "STUDENT",
+      "created_at": "2026-11-04 13:53:46.666712+00:00"
+    },
+    {
+      "user_id": "usr_351df5a97ea84ff092479ead317d6b18",
+      "auth_user_id": "67096bb3-3a6b-4117-b60a-46c211680d0e",
+      "university_id": "Al-Azhar",
+      "email": "moataz@gmail.com",
+      "first_name": "Moataz",
+      "last_name": "Khalid",
+      "role": "STUDENT",
+      "created_at": "2026-11-04 14:30:16.422899+00:00"
+    },
+    {
+      "user_id": "usr_884442fe18e04b8888e0cbd899706199",
+      "auth_user_id": "18781f48-42f1-4a58-a363-6ff5bbfa6467",
+      "university_id": "Al-Azhar",
+      "email": "qwe@gmail.com",
+      "first_name": "mr",
+      "last_name": "house",
+      "role": "PROFESSOR",
+      "created_at": "2026-11-22 11:23:36.169371+00:00"
+    },
+    {
+      "user_id": "usr_d4a78e5491fa4ac8b19b6926e262b007",
+      "auth_user_id": "cceb52f1-54fe-4207-b269-afbbac450704",
+      "university_id": "Al-Azhar",
+      "email": "ahmm@gmail.com",
+      "first_name": "Ahmed",
+      "last_name": "Ali",
+      "role": "PROFESSOR",
+      "created_at": "2026-11-22 11:28:44.313134+00:00"
+    },
+    {
+      "user_id": "usr_9d25a858ff1b4328a2b5fe0bd71f6afe",
+      "auth_user_id": "cfeb98e5-3fa1-4ee4-90fb-40ae608c3b36",
+      "university_id": "Al-Azhar",
+      "email": "ahm1@gmail.com",
+      "first_name": "Ahmed",
+      "last_name": "Ali",
+      "role": "PROFESSOR",
+      "created_at": "2026-11-22 11:29:57.874532+00:00"
+    },
+    {
+      "user_id": "usr_ab4164d15f2243d280727705b728a39f",
+      "auth_user_id": "8b6b3556-ad85-43e9-8b63-403af8464189",
+      "university_id": "Al-Azhar",
+      "email": "ali@gmail.com",
+      "first_name": "\u062d\u0645\u0635",
+      "last_name": "\u062d\u0645\u0627\u062f\u0629",
+      "role": "STUDENT",
+      "created_at": "2026-11-12 17:23:21.383506+00:00"
+    }
+  ],
+  "auth_users": [
+    {
+      "id": "35ddd126-183b-4368-bb99-e81a97cff8c8",
+      "email": "lmutaz@gmail.com",
+      "created_at": "2026-10-20 20:39:22.854494+00:00",
+      "last_sign_in_at": "2026-10-29 18:42:54.385791+00:00",
+      "email_confirmed_at": "2026-10-20 20:39:22.922514+00:00",
+      "raw_user_meta_data": {
+        "sub": "35ddd126-183b-4368-bb99-e81a97cff8c8",
+        "email": "lmutaz@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "8c97221a-5de8-4798-8427-c259c5ebb8db",
+      "email": "aliamer952006@gmail.com",
+      "created_at": "2026-10-24 15:23:21.272960+00:00",
+      "last_sign_in_at": "2026-11-12 17:18:14.624546+00:00",
+      "email_confirmed_at": "2026-10-24 15:23:21.288012+00:00",
+      "raw_user_meta_data": {
+        "sub": "8c97221a-5de8-4798-8427-c259c5ebb8db",
+        "email": "aliamer952006@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "fe1abd2d-b0a0-4ddc-a40c-922a1592c664",
+      "email": "mutaz99@gmail.com",
+      "created_at": "2026-10-19 19:09:01.198628+00:00",
+      "last_sign_in_at": "2026-11-22 00:27:04.353827+00:00",
+      "email_confirmed_at": "2026-10-19 19:09:01.218390+00:00",
+      "raw_user_meta_data": {
+        "sub": "fe1abd2d-b0a0-4ddc-a40c-922a1592c664",
+        "email": "mutaz99@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "e7ffbfb2-a4f8-488c-accd-75f5c362f540",
+      "email": "moatazkhalid221@gmail.com",
+      "created_at": "2026-10-20 15:33:56.888178+00:00",
+      "last_sign_in_at": "2026-11-19 12:51:27.288402+00:00",
+      "email_confirmed_at": "2026-10-20 15:33:56.913146+00:00",
+      "raw_user_meta_data": {
+        "sub": "e7ffbfb2-a4f8-488c-accd-75f5c362f540",
+        "email": "moatazkhalid221@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "d3e70c0a-a762-4bb0-b623-90c320143559",
+      "email": "mohabmosad7@gmail.com",
+      "created_at": "2026-10-19 20:14:35.686197+00:00",
+      "last_sign_in_at": "2026-11-22 17:02:30.147032+00:00",
+      "email_confirmed_at": "2026-10-19 20:14:35.718114+00:00",
+      "raw_user_meta_data": {
+        "sub": "d3e70c0a-a762-4bb0-b623-90c320143559",
+        "email": "mohabmosad7@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "783ca217-c7ac-4401-970b-62557fb4700c",
+      "email": "ahmed@gmail.com",
+      "created_at": "2026-11-04 13:26:59.482501+00:00",
+      "last_sign_in_at": "2026-11-22 10:45:14.613931+00:00",
+      "email_confirmed_at": "2026-11-04 13:26:59.535951+00:00",
+      "raw_user_meta_data": {
+        "sub": "783ca217-c7ac-4401-970b-62557fb4700c",
+        "email": "ahmed@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "25808451-3757-4bb0-b8a8-951f700afc15",
+      "email": "3li3mer6@gmail.com",
+      "created_at": "2026-10-19 18:48:07.477127+00:00",
+      "last_sign_in_at": "2026-11-12 17:24:38.623899+00:00",
+      "email_confirmed_at": "2026-10-19 18:48:07.556943+00:00",
+      "raw_user_meta_data": {
+        "sub": "25808451-3757-4bb0-b8a8-951f700afc15",
+        "email": "3li3mer6@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "48bae3af-c89f-4721-9f16-28808c4b4360",
+      "email": "mohammed@gmail.com",
+      "created_at": "2026-11-04 13:43:15.725111+00:00",
+      "last_sign_in_at": "2026-11-22 17:38:07.392591+00:00",
+      "email_confirmed_at": "2026-11-04 13:43:15.757914+00:00",
+      "raw_user_meta_data": {
+        "sub": "48bae3af-c89f-4721-9f16-28808c4b4360",
+        "email": "mohammed@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "cbf58bbc-6767-44cd-a840-315071a0700e",
+      "email": "aliamer@gmail.com",
+      "created_at": "2026-11-03 22:03:44.113539+00:00",
+      "last_sign_in_at": "2026-11-03 22:03:44.166960+00:00",
+      "email_confirmed_at": "2026-11-03 22:03:44.156071+00:00",
+      "raw_user_meta_data": {
+        "sub": "cbf58bbc-6767-44cd-a840-315071a0700e",
+        "email": "aliamer@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "cc3f0079-80c8-4d4c-93b7-a1d34f4a6e0d",
+      "email": "4hanaamer380@gmail.com",
+      "created_at": "2026-10-29 21:03:22.309564+00:00",
+      "last_sign_in_at": "2026-10-29 21:07:29.585742+00:00",
+      "email_confirmed_at": "2026-10-29 21:03:22.335938+00:00",
+      "raw_user_meta_data": {
+        "sub": "cc3f0079-80c8-4d4c-93b7-a1d34f4a6e0d",
+        "email": "4hanaamer380@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "abcb7b0b-717e-45c6-8a96-912311de5f80",
+      "email": "aliamer680367ali@gmail.com",
+      "created_at": "2026-10-29 20:51:02.650897+00:00",
+      "last_sign_in_at": "2026-10-29 20:52:43.142810+00:00",
+      "email_confirmed_at": "2026-10-29 20:51:02.690285+00:00",
+      "raw_user_meta_data": {
+        "sub": "abcb7b0b-717e-45c6-8a96-912311de5f80",
+        "email": "aliamer680367ali@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "35db107d-b02e-4ac0-9522-144662ff74c1",
+      "email": "abdo@gmail.com",
+      "created_at": "2026-10-29 19:03:38.018048+00:00",
+      "last_sign_in_at": "2026-10-29 19:03:38.067176+00:00",
+      "email_confirmed_at": "2026-10-29 19:03:38.054719+00:00",
+      "raw_user_meta_data": {
+        "sub": "35db107d-b02e-4ac0-9522-144662ff74c1",
+        "email": "abdo@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "f4558470-3601-408c-9052-2c6f67482547",
+      "email": "lmutaz99@gmail.com",
+      "created_at": "2026-10-20 15:33:14.253394+00:00",
+      "last_sign_in_at": "2026-11-19 13:58:15.954490+00:00",
+      "email_confirmed_at": "2026-10-20 15:33:14.360138+00:00",
+      "raw_user_meta_data": {
+        "sub": "f4558470-3601-408c-9052-2c6f67482547",
+        "email": "lmutaz99@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "a03bf308-b809-44a9-b43a-f881b6e8cb4c",
+      "email": "mohabmosad9@gmail.com",
+      "created_at": "2026-10-19 19:05:07.357252+00:00",
+      "last_sign_in_at": "2026-11-21 16:37:15.980811+00:00",
+      "email_confirmed_at": "2026-10-19 19:05:07.415541+00:00",
+      "raw_user_meta_data": {
+        "sub": "a03bf308-b809-44a9-b43a-f881b6e8cb4c",
+        "email": "mohabmosad9@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "7a278a03-6217-4307-ade8-c67bf92c8216",
+      "email": "ziad@gmail.com",
+      "created_at": "2026-11-04 13:53:45.342804+00:00",
+      "last_sign_in_at": "2026-11-04 13:53:45.410581+00:00",
+      "email_confirmed_at": "2026-11-04 13:53:45.397614+00:00",
+      "raw_user_meta_data": {
+        "sub": "7a278a03-6217-4307-ade8-c67bf92c8216",
+        "email": "ziad@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "7b8659c3-cb57-465c-a28e-97ba8aafd196",
+      "email": "ahm912007@gmail.com",
+      "created_at": "2026-11-22 00:04:32.867328+00:00",
+      "last_sign_in_at": "2026-11-22 00:06:49.521470+00:00",
+      "email_confirmed_at": "2026-11-22 00:04:32.916378+00:00",
+      "raw_user_meta_data": {
+        "sub": "7b8659c3-cb57-465c-a28e-97ba8aafd196",
+        "email": "ahm912007@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "8b6b3556-ad85-43e9-8b63-403af8464189",
+      "email": "ali@gmail.com",
+      "created_at": "2026-11-12 17:23:20.495927+00:00",
+      "last_sign_in_at": "2026-11-12 18:17:46.891423+00:00",
+      "email_confirmed_at": "2026-11-12 17:23:20.533401+00:00",
+      "raw_user_meta_data": {
+        "sub": "8b6b3556-ad85-43e9-8b63-403af8464189",
+        "email": "ali@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "4d350f72-ce8f-425f-a826-5512383d3b1b",
+      "email": "ahmm912007@gmail.com",
+      "created_at": "2026-11-22 00:11:30.407578+00:00",
+      "last_sign_in_at": "2026-11-22 00:11:30.472081+00:00",
+      "email_confirmed_at": "2026-11-22 00:11:30.457109+00:00",
+      "raw_user_meta_data": {
+        "sub": "4d350f72-ce8f-425f-a826-5512383d3b1b",
+        "email": "ahmm912007@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "67096bb3-3a6b-4117-b60a-46c211680d0e",
+      "email": "moataz@gmail.com",
+      "created_at": "2026-11-04 14:30:14.891982+00:00",
+      "last_sign_in_at": "2026-11-04 14:30:14.938324+00:00",
+      "email_confirmed_at": "2026-11-04 14:30:14.923959+00:00",
+      "raw_user_meta_data": {
+        "sub": "67096bb3-3a6b-4117-b60a-46c211680d0e",
+        "email": "moataz@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "48d884c8-b93b-4240-95a1-c850a347518f",
+      "email": "aliamerali@gmail.com",
+      "created_at": "2026-11-19 14:45:10.358749+00:00",
+      "last_sign_in_at": "2026-11-19 14:45:10.401112+00:00",
+      "email_confirmed_at": "2026-11-19 14:45:10.388780+00:00",
+      "raw_user_meta_data": {
+        "sub": "48d884c8-b93b-4240-95a1-c850a347518f",
+        "email": "aliamerali@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "027ebed0-ff10-4841-81ec-e1d76abf049a",
+      "email": "test_temp_img@example.com",
+      "created_at": "2026-11-13 23:13:05.566718+00:00",
+      "last_sign_in_at": "2026-11-13 23:13:05.832980+00:00",
+      "email_confirmed_at": "2026-11-13 23:13:05.579233+00:00",
+      "raw_user_meta_data": {
+        "email_verified": true
+      }
+    },
+    {
+      "id": "42c1283c-7693-4e70-bda9-8d6f7fc87746",
+      "email": "a@gmail.com",
+      "created_at": "2026-11-22 00:22:21.772232+00:00",
+      "last_sign_in_at": "2026-11-22 00:22:21.850762+00:00",
+      "email_confirmed_at": "2026-11-22 00:22:21.830430+00:00",
+      "raw_user_meta_data": {
+        "sub": "42c1283c-7693-4e70-bda9-8d6f7fc87746",
+        "email": "a@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "fcb56989-da28-4e02-9ef4-29ef6c469d33",
+      "email": "test_student_e2e@socratiq.ai",
+      "created_at": "2026-11-17 22:30:20.233863+00:00",
+      "last_sign_in_at": "2026-11-17 22:34:50.266663+00:00",
+      "email_confirmed_at": "2026-11-17 22:30:28.760256+00:00",
+      "raw_user_meta_data": {
+        "email_verified": true
+      }
+    },
+    {
+      "id": "47034940-907b-4268-9b4d-b8904dc8425d",
+      "email": "hello@gmail.com",
+      "created_at": "2026-11-22 00:22:39.140932+00:00",
+      "last_sign_in_at": "2026-11-22 00:22:39.153977+00:00",
+      "email_confirmed_at": "2026-11-22 00:22:39.149490+00:00",
+      "raw_user_meta_data": {
+        "sub": "47034940-907b-4268-9b4d-b8904dc8425d",
+        "email": "hello@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "7989791f-668a-4087-8ead-41b39c27dc8c",
+      "email": "ahm964231@gmail.com",
+      "created_at": "2026-11-22 00:19:45.818404+00:00",
+      "last_sign_in_at": "2026-11-22 00:19:45.873134+00:00",
+      "email_confirmed_at": "2026-11-22 00:19:45.857271+00:00",
+      "raw_user_meta_data": {
+        "sub": "7989791f-668a-4087-8ead-41b39c27dc8c",
+        "email": "ahm964231@gmail.com",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "4d3fe795-1a5e-4038-9f0c-4de227120579",
+      "email": "ahm@gmail.com",
+      "created_at": "2026-11-22 11:15:52.022495+00:00",
+      "last_sign_in_at": "2026-11-22 11:15:52.060246+00:00",
+      "email_confirmed_at": "2026-11-22 11:15:52.052257+00:00",
+      "raw_user_meta_data": {
+        "sub": "4d3fe795-1a5e-4038-9f0c-4de227120579",
+        "email": "ahm@gmail.com",
+        "last_name": "Ali",
+        "first_name": "Ahmed",
+        "socratiq_role": "PROFESSOR",
+        "university_id": "Al-Azhar",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "67acdcaf-39a1-4a78-8784-7ac8ae4de75d",
+      "email": "andrew@gmail.com",
+      "created_at": "2026-11-22 11:06:55.441757+00:00",
+      "last_sign_in_at": "2026-11-22 11:06:55.516985+00:00",
+      "email_confirmed_at": "2026-11-22 11:06:55.505685+00:00",
+      "raw_user_meta_data": {
+        "sub": "67acdcaf-39a1-4a78-8784-7ac8ae4de75d",
+        "email": "andrew@gmail.com",
+        "last_name": "maged",
+        "first_name": "andrew",
+        "socratiq_role": "STUDENT",
+        "university_id": "Al-Azhar",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "18781f48-42f1-4a58-a363-6ff5bbfa6467",
+      "email": "qwe@gmail.com",
+      "created_at": "2026-11-22 11:23:29.998985+00:00",
+      "last_sign_in_at": "2026-11-22 11:23:30.039324+00:00",
+      "email_confirmed_at": "2026-11-22 11:23:30.032891+00:00",
+      "raw_user_meta_data": {
+        "sub": "18781f48-42f1-4a58-a363-6ff5bbfa6467",
+        "email": "qwe@gmail.com",
+        "last_name": "house",
+        "first_name": "mr",
+        "socratiq_role": "PROFESSOR",
+        "university_id": "Al-Azhar",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "cceb52f1-54fe-4207-b269-afbbac450704",
+      "email": "ahmm@gmail.com",
+      "created_at": "2026-11-22 11:28:13.526893+00:00",
+      "last_sign_in_at": "2026-11-22 11:28:13.568721+00:00",
+      "email_confirmed_at": "2026-11-22 11:28:13.554141+00:00",
+      "raw_user_meta_data": {
+        "sub": "cceb52f1-54fe-4207-b269-afbbac450704",
+        "email": "ahmm@gmail.com",
+        "last_name": "Ali",
+        "first_name": "Ahmed",
+        "socratiq_role": "PROFESSOR",
+        "university_id": "Al-Azhar",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    },
+    {
+      "id": "cfeb98e5-3fa1-4ee4-90fb-40ae608c3b36",
+      "email": "ahm1@gmail.com",
+      "created_at": "2026-11-22 11:29:57.148205+00:00",
+      "last_sign_in_at": "2026-11-22 11:29:57.199441+00:00",
+      "email_confirmed_at": "2026-11-22 11:29:57.193521+00:00",
+      "raw_user_meta_data": {
+        "sub": "cfeb98e5-3fa1-4ee4-90fb-40ae608c3b36",
+        "email": "ahm1@gmail.com",
+        "last_name": "Ali",
+        "first_name": "Ahmed",
+        "socratiq_role": "PROFESSOR",
+        "university_id": "Al-Azhar",
+        "email_verified": true,
+        "phone_verified": false
+      }
+    }
+  ],
+  "counts": {
+    "users": 28,
+    "students": 18,
+    "professors": 10,
+    "universities": 99,
+    "courses": 9,
+    "classrooms": 9,
+    "enrollments": 12,
+    "materials": 7,
+    "stored_files": 16,
+    "documents": 6,
+    "document_chunks": 45,
+    "concepts": 5,
+    "assignment_concepts": 0,
+    "assignment_materials": 0,
+    "assignments": 6,
+    "assignment_versions": 6,
+    "assignment_attachments": 2,
+    "attempts": 13,
+    "submissions": 7,
+    "grade_evaluations": 2,
+    "grade_events": 0,
+    "student_celebrations": 4,
+    "ai_sessions": 10,
+    "ai_interactions": 75,
+    "messages": 241,
+    "ai_interaction_sources": 0,
+    "verification_runs": 6,
+    "verification_questions": 18,
+    "verification_responses": 18,
+    "verification_results": 18,
+    "learning_events": 184,
+    "evidence_candidates": 75,
+    "evidence_sources": 75,
+    "risk_signals": 0,
+    "student_concept_state": 6,
+    "student_preferences": 3,
+    "student_notes": 7,
+    "student_note_groups": 0,
+    "student_note_group_members": 0
+  },
+  "courses": [
+    {
+      "course_id": "crs_56057ad5160a4344810e9fc36b36c891",
+      "university_id": "Al-Azhar",
+      "instructor_id": "usr_d1b519ef3daa465caa39eb0630472360",
+      "code": "956",
+      "title": "Mckinzy",
+      "status": "ACTIVE"
+    },
+    {
+      "course_id": "crs_1554b9d7163241b5899af6241f92f247",
+      "university_id": "arish_university",
+      "instructor_id": "usr_61dc7dbbe0d94e489acbec212e051352",
+      "code": "\u0644\u0641\u064a\u0621",
+      "title": "\u0628\u0633\u064a",
+      "status": "ACTIVE"
+    },
+    {
+      "course_id": "crs_6467d951118a4a58a6603f89d428188d",
+      "university_id": "Al-Azhar",
+      "instructor_id": "usr_a7fc7861a4aa445bb904d22a5470ff81",
+      "code": "PHYS111",
+      "title": "Physics",
+      "status": "ACTIVE"
+    },
+    {
+      "course_id": "crs_8f8025d1c4b04f709dda8f9c62e90dd3",
+      "university_id": "Al-Azhar",
+      "instructor_id": "usr_b00dc20949254f79845defd446cd7e20",
+      "code": "111",
+      "title": "Math",
+      "status": "ACTIVE"
+    },
+    {
+      "course_id": "crs_fce2701a834d46c7baf46a5a15e875d0",
+      "university_id": "Al-Azhar",
+      "instructor_id": "usr_d1b519ef3daa465caa39eb0630472360",
+      "code": "ph 01",
+      "title": "\u0641\u0644\u0633\u0641\u0629",
+      "status": "ACTIVE"
+    },
+    {
+      "course_id": "crs_7c6a92f3fa7348f18f81f528a5dc0d8c",
+      "university_id": "Al-Azhar",
+      "instructor_id": "usr_83c7c9e4da4e48d5b1c3e436ba591d3b",
+      "code": "MATH 103",
+      "title": "Primary Mathematics \u2013 Level 3",
+      "status": "ACTIVE"
+    },
+    {
+      "course_id": "crs_0ec5c4831a9e4b31bfd6892d5088cf5e",
+      "university_id": "Al-Azhar",
+      "instructor_id": "usr_83c7c9e4da4e48d5b1c3e436ba591d3b",
+      "code": "ENG 103",
+      "title": "Primary English \u2013 Level 3",
+      "status": "ACTIVE"
+    },
+    {
+      "course_id": "crs_92bbfde9b19b4d71918185092f11b565",
+      "university_id": "Al-Azhar",
+      "instructor_id": "usr_83c7c9e4da4e48d5b1c3e436ba591d3b",
+      "code": "Ph203",
+      "title": "\u0641\u064a\u0632\u064a\u0642\u0627 1",
+      "status": "ACTIVE"
+    },
+    {
+      "course_id": "crs_3674054703664531a8c212affe4d15c1",
+      "university_id": "Al-Azhar",
+      "instructor_id": "usr_d1b519ef3daa465caa39eb0630472360",
+      "code": "m-01",
+      "title": "Anatomy",
+      "status": "ACTIVE"
+    }
+  ],
+  "classrooms": [
+    {
+      "classroom_id": "cls_190bba0cfb9c4cd690b4509f91fc5230",
+      "course_id": "crs_56057ad5160a4344810e9fc36b36c891",
+      "professor_id": "usr_d1b519ef3daa465caa39eb0630472360",
+      "name": "Main",
+      "join_code": "ZJRK-82R9"
+    },
+    {
+      "classroom_id": "cls_033cef51f7ee4b8d8454b1c39f2f08a7",
+      "course_id": "crs_1554b9d7163241b5899af6241f92f247",
+      "professor_id": "usr_61dc7dbbe0d94e489acbec212e051352",
+      "name": "Main",
+      "join_code": "FXRZ-QE72"
+    },
+    {
+      "classroom_id": "cls_e4c7760c0e5e483d912d90b25b5e8ad3",
+      "course_id": "crs_6467d951118a4a58a6603f89d428188d",
+      "professor_id": "usr_a7fc7861a4aa445bb904d22a5470ff81",
+      "name": "Main",
+      "join_code": "7DFG-CHXN"
+    },
+    {
+      "classroom_id": "cls_e7f5b3a25762409e95efb939aa7afbc7",
+      "course_id": "crs_8f8025d1c4b04f709dda8f9c62e90dd3",
+      "professor_id": "usr_b00dc20949254f79845defd446cd7e20",
+      "name": "Main",
+      "join_code": "JBB9-KVZR"
+    },
+    {
+      "classroom_id": "cls_c8317e0958444b9785154756ed22af25",
+      "course_id": "crs_fce2701a834d46c7baf46a5a15e875d0",
+      "professor_id": "usr_d1b519ef3daa465caa39eb0630472360",
+      "name": "Main",
+      "join_code": "CC48-ZHUY"
+    },
+    {
+      "classroom_id": "cls_576dc78de6bb455bbc3d483cca80fb37",
+      "course_id": "crs_7c6a92f3fa7348f18f81f528a5dc0d8c",
+      "professor_id": "usr_83c7c9e4da4e48d5b1c3e436ba591d3b",
+      "name": "Main",
+      "join_code": "RBMU-SMR9"
+    },
+    {
+      "classroom_id": "cls_1274e40799934875aeef9837e08d91ea",
+      "course_id": "crs_0ec5c4831a9e4b31bfd6892d5088cf5e",
+      "professor_id": "usr_83c7c9e4da4e48d5b1c3e436ba591d3b",
+      "name": "Main",
+      "join_code": "FWBK-BDB6"
+    },
+    {
+      "classroom_id": "cls_3a128d7c8c394eb8be79c905c0219b32",
+      "course_id": "crs_92bbfde9b19b4d71918185092f11b565",
+      "professor_id": "usr_83c7c9e4da4e48d5b1c3e436ba591d3b",
+      "name": "Main",
+      "join_code": "2KTC-UFK3"
+    },
+    {
+      "classroom_id": "cls_6fdfddcd3d7e4ea6b35fa1a6f9b81662",
+      "course_id": "crs_3674054703664531a8c212affe4d15c1",
+      "professor_id": "usr_d1b519ef3daa465caa39eb0630472360",
+      "name": "Main",
+      "join_code": "VJYA-969Z"
+    }
+  ]
+}

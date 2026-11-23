@@ -25,6 +25,8 @@ type MathItem = { tex: string; raw: string; display: boolean } | { pending: stri
 
 const CODE_OPEN = "", CODE_CLOSE = "", INL_OPEN = "", INL_CLOSE = "", BLK_OPEN = "", BLK_CLOSE = ""
 const MATH_LANGS = new Set(["latex", "tex", "math", "katex"])
+/** An opening ``` fence at the start of a line with code after it and no closing fence (only looked for in the text after the last closed fence). */
+const UNCLOSED_FENCE = /(^|\n)[ \t]*```([^\n`]*)\n([\s\S]*)$/
 
 interface Ctx { codes: string[]; maths: MathItem[]; compact: boolean; key: string }
 
@@ -279,20 +281,30 @@ export function RichText({ text, detectCode = false, renderCodeBlock, streaming 
   const parts = text.split(/```([^\n`]*)\n?([\s\S]*?)```/g)
   // split with two capture groups cycles: prose, fence tag, code, prose, fence tag, code, ..., prose
   const out: ReactNode[] = []
-  for (let i = 0; i < parts.length; i += 3) {
-    const prose = parts[i]
-    if (prose) out.push(<Prose key={`p${i}`} keyBase={`p${i}`} text={prose} streaming={streaming && i + 3 >= parts.length} compact={compact} />)
-    if (i + 2 < parts.length) {
-      const lang = (parts[i + 1] ?? "").trim().toLowerCase()
-      const code = (parts[i + 2] ?? "").replace(/\n$/, "")
-      if (MATH_LANGS.has(lang) && code.trim() && (isMostlyTex(code) || /\$|\\\[|\\begin\{/.test(code))) {
-        out.push(<MathFence key={`c${i}`} keyBase={`c${i}`} code={code} lang={lang} streaming={false} />)
-        continue
-      }
-      if (compact) { out.push(<code key={`c${i}`} dir="ltr" className="sq-code-inline">{code.split("\n")[0]}</code>); continue }
-      const idx = i / 3                                         // stable per fence position (run results are stored under this key)
-      out.push(<Fragment key={`c${i}`}>{renderCodeBlock ? renderCodeBlock(code, lang, idx) : <CodeBlock code={code} />}</Fragment>)
+  const pushFence = (rawLang: string, code: string, key: string, idx: number) => {
+    const lang = rawLang.trim().toLowerCase()
+    if (MATH_LANGS.has(lang) && code.trim() && (isMostlyTex(code) || /\$|\\\[|\\begin\{/.test(code))) {
+      out.push(<MathFence key={key} keyBase={key} code={code} lang={lang} streaming={false} />)
+      return
     }
+    if (compact) { out.push(<code key={key} dir="ltr" className="sq-code-inline">{code.split("\n")[0]}</code>); return }
+    // idx is stable per fence position (run results are stored under it)
+    out.push(<Fragment key={key}>{renderCodeBlock ? renderCodeBlock(code, lang, idx) : <CodeBlock code={code} />}</Fragment>)
+  }
+  for (let i = 0; i < parts.length; i += 3) {
+    let prose = parts[i]
+    const last = i + 3 >= parts.length
+    // A FINISHED reply whose last ``` fence was never closed (the model forgot the closing fence) is still a code block: before, it fell
+    // through as prose with the backticks showing and no Run button. While streaming, an open fence stays text (more is on its way).
+    let open: RegExpExecArray | null = null
+    if (last && !streaming && prose) {
+      open = UNCLOSED_FENCE.exec(prose)
+      if (open && !open[3].trim()) open = null
+      if (open) prose = prose.slice(0, open.index + open[1].length)
+    }
+    if (prose) out.push(<Prose key={`p${i}`} keyBase={`p${i}`} text={prose} streaming={streaming && last} compact={compact} />)
+    if (i + 2 < parts.length) pushFence(parts[i + 1] ?? "", (parts[i + 2] ?? "").replace(/\n$/, ""), `c${i}`, i / 3)
+    if (open) pushFence(open[2], open[3].replace(/\s+$/, ""), `u${i}`, i / 3)
   }
   if (compact) return <span className="sq-rich-compact">{out}</span>
   return <div className="sq-rich">{out}</div>

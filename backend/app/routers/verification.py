@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Request
 from psycopg import errors as pgerr
 
-from ..access import student_assignment
+from ..access import allowed_document_ids, student_assignment
 from ai.verification.safety import outcome_for_score
 from ..auth import CurrentUser, get_db, require_student
 from ..db import Database, many, new_id, one
@@ -19,9 +19,15 @@ router = APIRouter(tags=["verification"])
 STEPS = ("EXPLAIN", "MODIFY", "TRANSFER")
 
 
+def _concepts(c, a) -> list[str]:
+    """Every concept linked to the assignment (stable order). The question generator picks the one best grounded in the lesson."""
+    rows = many(c, "SELECT k.name FROM assignment_concepts ac JOIN concepts k ON k.concept_id=ac.concept_id WHERE ac.assignment_id=%s ORDER BY k.name", (a["assignment_id"],))
+    return [r["name"] for r in rows if r["name"]]
+
+
 def _concept(c, a) -> str:
-    row = one(c, "SELECT k.name FROM assignment_concepts ac JOIN concepts k ON k.concept_id=ac.concept_id WHERE ac.assignment_id=%s ORDER BY k.name LIMIT 1", (a["assignment_id"],))
-    return (row["name"] if row else None) or a.get("subject_area") or a["title"]
+    names = _concepts(c, a)
+    return (names[0] if names else None) or a.get("subject_area") or a["title"]
 
 
 def _state(c, run) -> dict:
@@ -59,8 +65,14 @@ def _generate_if_needed(request: Request, db: Database, user: CurrentUser, run_i
         idx = next(i for i, s in enumerate(st["steps"]) if s["status"] == "current")
         a = student_assignment(c, user, run["assignment_id"])
         sub = one(c, "SELECT submission_text FROM submissions WHERE attempt_id=%s", (run["attempt_id"],))
-        concept = _concept(c, a)
-    ch = request.app.state.ai.generate_challenge(assignment=a, concept=concept, verification_type=STEPS[idx], student_work=(sub or {}).get("submission_text") or "")
+        concepts = _concepts(c, a)
+        concept = (concepts[0] if concepts else None) or a.get("subject_area") or a["title"]
+        # Earlier questions of this run: the generator must test a different aspect, and the quality gate rejects repeats.
+        previous = [r["question_text"] for r in many(c, "SELECT question_text FROM verification_questions WHERE verification_id=%s ORDER BY display_order",
+                                                     (run_id,)) if r["question_text"]]
+        docs = allowed_document_ids(c, a)
+    ch = request.app.state.ai.generate_challenge(assignment=a, concept=concept, verification_type=STEPS[idx], student_work=(sub or {}).get("submission_text") or "",
+                                                 candidate_concepts=concepts, previous_questions=previous, allowed_document_ids=docs)
     try:
         with db.tx() as c:
             c.execute("SELECT 1 FROM verification_runs WHERE verification_id=%s FOR UPDATE", (run_id,))

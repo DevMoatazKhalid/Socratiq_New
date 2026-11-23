@@ -7,6 +7,7 @@ import { useAnswerVerification, useStartVerification, useStudentAssignment, useS
 import { ApiError } from "@/lib/api"
 import { useQueryClient } from "@tanstack/react-query"
 import { celebrateVerification } from "@/lib/celebrate"
+import { usePasteGuard } from "@/lib/pasteGuard"
 
 const LABEL: Record<string, string> = { EXPLAIN: "Explain", MODIFY: "Modify", TRANSFER: "Transfer" }
 
@@ -24,6 +25,8 @@ export default function Verification() {
   const [error, setError] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<string | null>(null)
   const began = useRef(false)
+  // The three comprehension answers must be the student's own words: paste is blocked in this field only (see lib/pasteGuard.ts).
+  const pasteGuard = usePasteGuard()
 
   async function begin() {
     setError(null)
@@ -50,6 +53,7 @@ export default function Verification() {
       const r = await answerM.mutateAsync({ verificationId: state.verificationId, answer })
       setFeedback(r.result.feedback || null)
       setAnswer("")
+      pasteGuard.dismiss()
       setState(r.state)
       if (r.state.status === "COMPLETED" && state.status !== "COMPLETED")
         void celebrateVerification(qc, { title: assignment.data?.title ?? "this assignment", passed: r.state.outcome === "PASS" })
@@ -115,15 +119,21 @@ export default function Verification() {
                       <p id="verification-question" className="mt-3 text-base text-[var(--color-ink)]">{current.question}</p>
                     </div>
                     <textarea dir="auto"
+                      {...pasteGuard.guardProps}
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
                       rows={5}
                       maxLength={8000}
                       aria-label="Your response"
-                      aria-describedby="verification-question"
+                      aria-describedby={pasteGuard.notice ? "verification-question verification-paste-notice" : "verification-question"}
+                      data-paste-guard="verification"
                       placeholder="Write your response…"
                       className="mt-5 w-full rounded-[12px] border border-[var(--color-control-border)] px-4 py-3 text-[15px] placeholder:text-[var(--color-ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-teal-dark)]"
                     />
+                    {/* Always mounted so screen readers announce the message when it appears. */}
+                    <p id="verification-paste-notice" role="status" aria-live="polite" className="mt-2 min-h-[20px] text-[13px] text-[var(--color-ink-soft)]">
+                      {pasteGuard.notice}
+                    </p>
                   </>
                 ) : (
                   <p className="mt-5 text-sm text-[var(--color-ink-soft)]" aria-live="polite">

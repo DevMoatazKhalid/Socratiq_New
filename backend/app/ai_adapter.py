@@ -127,8 +127,12 @@ class DbHistoryProvider:
 
 
 class AIAdapter:
-    def __init__(self, coach: Any, verification_service: Any, timeout_seconds: int = 90, max_workers: int = 8, grading_service: Any = None):
+    def __init__(self, coach: Any, verification_service: Any, timeout_seconds: int = 90, max_workers: int = 8, grading_service: Any = None,
+                 course_retriever: Any = None):
         self.coach, self.verification = coach, verification_service
+        # Scoped RAG retriever (ai.tools.course_retrieval.RAGCourseRetriever). Used to ground verification questions in the lesson
+        # material; optional, so adapters built without it (tests, RAG disabled) still generate questions from the instructions.
+        self.course_retriever = course_retriever
         self.grading = grading_service                  # built on first use (see _grading_service), so a Coach-only deployment never loads it
         self.timeout = timeout_seconds
         self._pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="ai")
@@ -241,12 +245,41 @@ class AIAdapter:
             visual_plan=(dict(r.visual_plan) if getattr(r, "visual_plan", None) else None))
 
     # ------------------------------------------------------------------ Verification
-    def generate_challenge(self, *, assignment: dict, concept: str, verification_type: str, student_work: str) -> Challenge:
+    def generate_challenge(self, *, assignment: dict, concept: str, verification_type: str, student_work: str,
+                           candidate_concepts: Optional[list[str]] = None, previous_questions: Optional[list[str]] = None,
+                           allowed_document_ids: Optional[list[str]] = None) -> Challenge:
         from ai.verification.models import VerificationChallengeRequest, VerificationType
-        ch = self._call(self.verification.generate_challenge, VerificationChallengeRequest(
-            assignment_id=assignment["assignment_id"], concept=concept, verification_type=VerificationType(verification_type),
-            student_work=student_work[:12000], course_context=(assignment.get("instructions") or "")[:4000] or None))
+
+        def run():
+            material = self._lesson_material(assignment, concept, candidate_concepts or [], allowed_document_ids)
+            return self.verification.generate_challenge(VerificationChallengeRequest(
+                assignment_id=assignment["assignment_id"], concept=concept, verification_type=VerificationType(verification_type),
+                student_work=student_work[:12000], course_context=(assignment.get("instructions") or "")[:4000] or None,
+                assignment_title=assignment.get("title"), subject_area=assignment.get("subject_area"),
+                is_programming=bool(assignment.get("is_programming")), lesson_material=material,
+                candidate_concepts=list(candidate_concepts or []), previous_questions=list(previous_questions or [])))
+        ch = self._call(run)
+        if getattr(ch, "source", "generated") != "generated":
+            log.info("verification question for %s/%s came from %s: %s", assignment["assignment_id"], verification_type,
+                     ch.source, "; ".join(getattr(ch, "quality_notes", []) or []))
         return Challenge(verification_type=ch.verification_type.value, concept=ch.concept, question=ch.question, criteria=list(ch.criteria))
+
+    def _lesson_material(self, assignment: dict, concept: str, concepts: list[str], allowed_document_ids: Optional[list[str]]) -> list[str]:
+        """Course-material excerpts for the assignment, retrieved with the same trusted scope as the Coach (university, course, classroom,
+        assignment, document whitelist). Best effort: a retrieval failure means the question is grounded in the instructions only."""
+        if self.course_retriever is None or allowed_document_ids is None:
+            return []
+        try:
+            from ai.rag.models import RetrievalScope
+            scope = RetrievalScope(university_id=assignment["university_id"], course_id=assignment["course_id"],
+                                   classroom_id=assignment.get("classroom_id"), assignment_id=assignment["assignment_id"],
+                                   allowed_document_ids=list(allowed_document_ids) or [NO_DOCUMENTS_SENTINEL])
+            query = " ".join(x for x in [assignment.get("title") or "", concept or "", ", ".join(concepts[:5])] if x).strip()
+            chunks = self.course_retriever.retrieve_scoped(scope, query or concept, 4)
+            return [c.content for c in chunks if getattr(c, "content", None)][:4]
+        except Exception:  # noqa: BLE001
+            log.warning("lesson-material retrieval for verification failed; grounding on instructions only", exc_info=True)
+            return []
 
     def evaluate(self, *, student_id: str, assignment: dict, concept: str, verification_type: str, question: str,
                  criteria: list[str], answer: str, student_work: str) -> Evaluation:
@@ -305,4 +338,4 @@ def build_ai_adapter(db: Database, rag: Any) -> AIAdapter:
     # university_id is set, and we always set it).
     retriever = RAGCourseRetriever(rag, university_id="__unscoped_disabled__", classroom_id=None)
     coach = Coach(course_tool=CourseRetrievalTool(retriever=retriever), history_tool=StudentHistoryTool(provider=DbHistoryProvider(db)))
-    return AIAdapter(coach, VerificationService())
+    return AIAdapter(coach, VerificationService(), course_retriever=retriever)
